@@ -1,6 +1,8 @@
 # Orienteering Problem Solver Library
 
-This is an Orienteering project using CMake.
+This is an Orienteering project using CMake, which aims to develop solvers for solving variants of Orienteering problems.
+
+--------------------------------------------
 
 The requirements are:
 
