@@ -3,7 +3,7 @@
 
 # Optionally glob, but only for CMake 3.12 or later:
 file(GLOB HEADER_LIST CONFIGURE_DEPENDS "${ModernCMakeExample_SOURCE_DIR}/include/*.hpp")
-# set(HEADER_LIST "${OrienteeringCpp_SOURCE_DIR}/include/modern/lib.hpp")
+# set(HEADER_LIST "${OrienteeringLib_SOURCE_DIR}/include/modern/lib.hpp")
 
 # Make an automatic library - will be static or dynamic based on user setting
 add_library(modern_library lib.cpp ${HEADER_LIST})
@@ -19,7 +19,7 @@ target_compile_features(modern_library PUBLIC cxx_std_11)
 
 # IDEs should put the headers in a nice place
 source_group(
-  TREE "${OrienteeringCpp_SOURCE_DIR}/include"
+  TREE "${OrienteeringLib_SOURCE_DIR}/include"
   PREFIX "Header Files"
   FILES ${HEADER_LIST}
   )
