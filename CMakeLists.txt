@@ -24,7 +24,6 @@ option(PACKAGE_TESTS "Build the tests" ON)
 message("[INFO] Build the tests: ${PACKAGE_TESTS}")
 if(PACKAGE_TESTS)
     enable_testing()
-    include(GoogleTest)
     add_subdirectory(tests)
 endif()
 
