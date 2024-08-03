@@ -1,17 +1,13 @@
-#include <dummy/lib.hpp>
-
-#include <fmt/format.h>
-
 #include <iostream>
 #include <vector>
 #include <tuple>
+#include <cmath>
 
 int main() {
-    std::vector<double> input = {1.2, 2.3, 3.4, 4.5};
-
-    auto [mean, moment] = accumulate_vector(input);
-
-    fmt::print("Mean: {}, Moment: {}\n",  mean, moment);
-
+    std::cout << std::round(0.5) << std::endl;
+    std::cout << std::round(0.412134315) << std::endl;
+    std::cout << std::round(0.5745233111) << std::endl;
+    std::cout << std::ceil(0.412134315) << std::endl;
+    std::cout << std::ceil(0.5745233111) << std::endl;
     return 0;
 }
