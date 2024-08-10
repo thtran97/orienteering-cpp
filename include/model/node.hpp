@@ -7,7 +7,7 @@ namespace oplib::model{
         /* data */
         int id;
         float x_coord, y_coord;
-        double profit;
+        double score;
         int t_opening, t_closing, t_service;
     };
     

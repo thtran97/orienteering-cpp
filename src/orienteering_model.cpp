@@ -12,17 +12,6 @@ OrienteeringModel::OrienteeringModel()
     instance_name = "default";
 }
 
-
-int OrienteeringModel::get_travel_duration(int from_node_i, int to_node_j)
-{
-    return t_travel[from_node_i][to_node_j];
-}
-
-Node OrienteeringModel::get_node(int i)
-{
-    return nodes[i];
-}
-
 void OrienteeringModel::update_travel_duration_matrix(int time_factor)
 {
     int n = nodes.size();
@@ -47,23 +36,21 @@ int OrienteeringModel::compute_travel_duration(int i, int j, int time_factor)
     return static_cast<int>(distance);
 }
 
-void OrienteeringModel::parse_instance(std::string file, int time_factor)
-{
-    ifstream infile(file);
-    if (!infile){
-        cerr << "Error: unable to open file " << file << endl;
-        exit(1);
-    }
-
-    infile >> instance_name;
-    int n;
-    infile >> n;
-    nodes.resize(n);
-    for (int i = 0; i < n; ++i){
-        infile >> nodes[i].id >> nodes[i].x_coord >> nodes[i].y_coord >> nodes[i].profit >> nodes[i].t_opening >> nodes[i].t_closing >> nodes[i].t_service;
-    }
-    infile.close();
-
-    update_travel_duration_matrix(time_factor);
+void OrienteeringModel::print_summary(){
+    std::cout << "[INFO::model] Model summary\n";
+    std::cout << "---------------------------------------------" << "\n";
+    // std::cout << "|     inst_id : " << instance_name << "\n";
+    std::cout << "|     #nodes  : " << nodes.size() 
+            << " (start_id = " << STARTING_ID << ", end_id = " << ENDING_ID << ")\n";
+    std::cout << "|     T_max   : " << T_MAX << "\n";
+    std::cout << "---------------------------------------------" << "\n";
 }
 
+void OrienteeringModel::add_node(double x, double y, int score){
+    model::Node new_node;
+    new_node.id = nodes.size();
+    new_node.x_coord = x;
+    new_node.y_coord = y;
+    new_node.score = score;
+    nodes.emplace_back(new_node);
+}
