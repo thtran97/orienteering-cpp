@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.14...3.29)
 
 # Project name and a few useful settings. Other commands can pick up the results
-project("genopLib")
+project(genopLib)
 
 message("----------------------------------------")
 message("[INFO] Start configuring project ${PROJECT_NAME}: ${CMAKE_SOURCE_DIR}")
