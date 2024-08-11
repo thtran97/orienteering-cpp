@@ -7,11 +7,6 @@
 using namespace std;
 using namespace oplib::model;
 
-OrienteeringModel::OrienteeringModel()
-{
-    instance_name = "default";
-}
-
 void OrienteeringModel::update_travel_duration_matrix(int time_factor)
 {
     int n = nodes.size();
@@ -53,4 +48,8 @@ void OrienteeringModel::add_node(double x, double y, int score){
     new_node.y_coord = y;
     new_node.score = score;
     nodes.emplace_back(new_node);
+}
+
+void OrienteeringModel::preprocessing_precedence_graph(){
+    // TODO: pre-computing if there exists arc between two nodes, if temporal constraints are declared
 }

@@ -27,6 +27,11 @@ int parse_instance(model::OrienteeringModel & op_model, std::string file, int ti
     double original_tmax;
     int nb_paths;
     infile >> original_tmax >> nb_paths;
+    if  (nb_paths < 1){
+        std::cerr << "Error: number of paths used must be positive" << std::endl;
+        exit(1);
+    }
+
     op_model.set_time_budget(original_tmax * time_factor);
     // read point data
     while (!infile.eof()){
@@ -51,16 +56,17 @@ int main(int argc, char** argv){
     model::OrienteeringModel op_model; 
     char * filename = arg_parser.getCmdOption("-file"); 
     if (!filename) std::cout << "Require instance file !\n";
-    parse_instance(op_model, filename);
+    int nb_paths = parse_instance(op_model, filename);
     op_model.print_summary();
 
-    solver::IteratedLocalSearch lns_solver(op_model);
+    solver::IteratedLocalSearch ils_solver(op_model);
     int seed = arg_parser.getCmdInt("-seed", 0);
-    lns_solver.set_seed(seed);
+    ils_solver.set_seed(seed);
 
     double timeout = arg_parser.getCmdDouble("-timeout", 0.0);
-    lns_solver.set_timeout(timeout);
-    lns_solver.solve();
+    ils_solver.set_timeout(timeout);
+    ils_solver.set_nb_paths(nb_paths);
+    ils_solver.solve();
 
     std::cout << "[INFO:main] Done\n";
     return 0;
