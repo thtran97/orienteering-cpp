@@ -61,7 +61,8 @@ namespace oplib::solver{
         int NB_NODES = 0; // nb of nodes in the graph (including depots)
 
         std::vector<std::vector<int>> visit_sequences; // node ordering in each path
-    
+        std::vector<int> t_arrival; // used for recording the arrival time at a node if being visited
+        std::vector<int> max_shift; // used for incremental checking temporal constraints
         custom_types::heuristic_queue restricted_feasible_moves; // restricted list of *best k* feasible moves 
 
         // --------SOLVING PARAMETERS------------
@@ -71,16 +72,23 @@ namespace oplib::solver{
 
 
         bool is_timeout_reached();
-        void construct();
+        void single_pass_construct();
+        void multi_pass_construct();
         void perturb();
         void check_acceptance_criterion();
 
         void reset_visit_sequences();
         // Try the insertion of `node_id` into the `position` in `path_id`, and return the time_shift if possible, otherwise `INT_MAX`
-        int try_insertion(int node_id, int path_id, int position); 
-        void push_move_insert(int node_id, int path_id, int position, int time_shift);        
+        int eval_insertion(int node_id, int path_id, int position); 
+        void push_move_insert(int node_id, int path_id, int position, int time_shift);
+        // Insert `node_id` into into the `position` in `path_id`, but requires invoking `eval_insertion` before applying insertion. 
+        void insert_node(int node_id, int path_id, int position, int shift_time);
+        
         // Select a move from `restricted_feasible_moves` using Random Wheel Selection (RWS)
         custom_types::heuristic_move select_next_move();
+
+
+        // --------------------------------------
 
         inline double heuristic(int score, double shift){
             return pow(static_cast<double>(score), 2) / (shift + 1e-5);
