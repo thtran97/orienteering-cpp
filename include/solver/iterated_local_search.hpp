@@ -43,17 +43,20 @@ namespace oplib::solver{
         ~IteratedLocalSearch()=default;
 
         void solve();
+        void print_solutions();
 
         inline void set_seed(int random_seed){rnd_gen.seed(random_seed);};
         inline void set_timeout(double timeout){TIMEOUT_DURATION=timeout* 1000.;};
         inline void set_nb_paths(int nb_paths){NB_PATHS=nb_paths;};
+
+        void _test_construct();
 
     private:
         model::OrienteeringModel& model;
         std::random_device rd;
         std::mt19937 rnd_gen;
         
-        double TIMEOUT_DURATION; // MAx CPU time used for solving problem
+        double TIMEOUT_DURATION; // Max CPU time used for solving problem
         std::chrono::duration<double, std::milli> solving_duration; // solving duration until now
         std::chrono::high_resolution_clock::time_point start_ts; // at which timestamp the solver starts
 
@@ -61,6 +64,7 @@ namespace oplib::solver{
         int NB_NODES = 0; // nb of nodes in the graph (including depots)
 
         std::vector<std::vector<int>> visit_sequences; // node ordering in each path
+        std::vector<int> visit_duration; // total visit duration of each path
         std::vector<int> t_arrival; // used for recording the arrival time at a node if being visited
         std::vector<int> max_shift; // used for incremental checking temporal constraints
         custom_types::heuristic_queue restricted_feasible_moves; // restricted list of *best k* feasible moves 
@@ -69,7 +73,6 @@ namespace oplib::solver{
         int RCL_SIZE = 5; // size of the Restricted Candidate List (RCL)
 
         // --------------------------------------
-
 
         bool is_timeout_reached();
         void single_pass_construct();

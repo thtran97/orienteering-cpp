@@ -29,6 +29,7 @@ namespace oplib::model{
         inline int get_starting_id(){return STARTING_ID;};
         inline int get_ending_id(){return ENDING_ID;};
         inline int get_travel_duration(int from_node_i, int to_node_j){return t_travel[from_node_i][to_node_j];};
+        inline int get_time_budget(){return T_MAX;};
 
         inline void set_time_budget(int t_max){T_MAX=t_max;};
         inline void set_starting_point(int id){STARTING_ID=id;};

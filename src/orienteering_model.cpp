@@ -34,7 +34,6 @@ int OrienteeringModel::compute_travel_duration(int i, int j, int time_factor)
 void OrienteeringModel::print_summary(){
     std::cout << "[INFO::model] Model summary\n";
     std::cout << "---------------------------------------------" << "\n";
-    // std::cout << "|     inst_id : " << instance_name << "\n";
     std::cout << "|     #nodes  : " << nodes.size() 
             << " (start_id = " << STARTING_ID << ", end_id = " << ENDING_ID << ")\n";
     std::cout << "|     T_max   : " << T_MAX << "\n";

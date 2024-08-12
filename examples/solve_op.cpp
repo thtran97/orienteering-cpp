@@ -1,6 +1,5 @@
 #include <iostream>
 #include <fstream>
-
 #include "model/orienteering_model.hpp"
 #include "solver/iterated_local_search.hpp"
 #include "utils/argument_parser.hpp"
@@ -66,8 +65,8 @@ int main(int argc, char** argv){
     double timeout = arg_parser.getCmdDouble("-timeout", 0.0);
     ils_solver.set_timeout(timeout);
     ils_solver.set_nb_paths(nb_paths);
-    ils_solver.solve();
-
+    // ils_solver.solve();
+    ils_solver._test_construct();
     std::cout << "[INFO:main] Done\n";
     return 0;
 }

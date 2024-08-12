@@ -32,7 +32,7 @@ void IteratedLocalSearch::single_pass_construct(){
     std::vector<int> selectable(NB_NODES);
     for (int i=0; i<NB_NODES; i++)
         selectable[i] = i;
-    std::random_shuffle(selectable.begin(), selectable.end(), rnd_gen);
+    std::shuffle(selectable.begin(), selectable.end(), rnd_gen);
 
     // Process each node, except depots,in a random order
     // Greedily insert node into a path, if possible, otherwise process next node 
@@ -55,25 +55,32 @@ void IteratedLocalSearch::single_pass_construct(){
             if (best_position > 0) 
                 push_move_insert(node_id, path_id, best_position, min_shift);        
         }
-        
         // cannot insert node_id, pass
         if (restricted_feasible_moves.empty()) continue;
 
         // selection & apply the *best* insertion (in a randomized greedy way)
         std::vector<int> best_insertion = select_next_move().second;
-        insert_node(node_id, best_insertion[0], best_insertion[1], best_insertion[2]);
+        insert_node(best_insertion[0], best_insertion[1], best_insertion[2], best_insertion[3]);
     }
 }
 
 void IteratedLocalSearch::multi_pass_construct(){
     // O(N*N*M*M)
     std::cout << "multi-pass-construction\n";
+    std::vector<bool> is_visited;
+    is_visited.assign(NB_NODES, false);
+    for (int path_id=0; path_id<NB_PATHS; path_id++){
+        for (int node_id: visit_sequences[path_id])
+            is_visited[node_id] = true;
+    }
+    
     bool found_move;
     do{
         found_move = false;
         // evaluate insertion for each customer, except depots 
         for (int node_id=0; node_id<NB_NODES; node_id++){
             if (model.is_depot(node_id)) continue;
+            if (is_visited[node_id]) continue;
             // for each path, evaluate all possible insertions
             for (int path_id=0; path_id<NB_PATHS; path_id++){
                 // check insertion into every possible position between two depots
@@ -97,7 +104,10 @@ void IteratedLocalSearch::multi_pass_construct(){
             // selection & apply the *best* insertion (in a randomized greedy way)
             std::vector<int> best_insertion = select_next_move().second;
             insert_node(best_insertion[0], best_insertion[1], best_insertion[2], best_insertion[3]);
+            is_visited[best_insertion[0]] = true;
             found_move = true;
+            if (!restricted_feasible_moves.empty())
+                std::cerr << "Error: this queue should be empty.\n";
         }
     } while (found_move);
 }
@@ -115,12 +125,15 @@ void IteratedLocalSearch::check_acceptance_criterion(){
 
 void IteratedLocalSearch::reset_visit_sequences(){
     // * reset visit ordering info: seq = {start -> end}
-    if (visit_sequences.empty())
+    if (visit_sequences.empty()){
         visit_sequences.resize(NB_PATHS);
+        visit_duration.resize(NB_PATHS);
+    }
     for (int path_id=0; path_id<NB_PATHS; path_id++){
         if (!visit_sequences[path_id].empty()) 
             visit_sequences[path_id].clear();
         visit_sequences[path_id] = {model.get_starting_id(), model.get_ending_id()};
+        visit_duration[path_id] = model.get_travel_duration(model.get_starting_id(), model.get_ending_id());
     }
 }
 
@@ -142,7 +155,9 @@ int IteratedLocalSearch::eval_insertion(int node_id, int path_id, int position){
     int shift = model.get_travel_duration(prev_node_id, node_id) 
                 + model.get_travel_duration(node_id, next_node_id) 
                 - model.get_travel_duration(prev_node_id, next_node_id);
-    // TODO: compare with T_max ?
+    // trivial check: current end date + shift <  TIMEOUT
+    if (visit_duration[path_id] + shift > model.get_time_budget())
+        return INT_MAX;
     return shift;
 }
 
@@ -163,7 +178,6 @@ custom_types::heuristic_move IteratedLocalSearch::select_next_move(){
     
     double accum_proba = 0.;
     double rnd_theshold = utils::get_rnd_double(0., 1., rnd_gen);
-    
     for (const auto & move: candidates){
         accum_proba += move.first / sum_f;
         if (accum_proba > rnd_theshold)
@@ -173,5 +187,38 @@ custom_types::heuristic_move IteratedLocalSearch::select_next_move(){
 }
 
 void IteratedLocalSearch::insert_node(int node_id, int path_id, int position, int shift_time){
-    // TODO
+    // update visit sequence
+    visit_sequences[path_id].insert(visit_sequences[path_id].begin() + position, node_id);
+    // update time info
+    visit_duration[path_id] += shift_time;
+}
+
+void IteratedLocalSearch::print_solutions(){
+    for (int path_id = 0; path_id < NB_PATHS; path_id++){
+        std::cout << "#" << path_id << ": ";
+        int total_score = 0;
+        for (int n: visit_sequences[path_id]){
+            std::cout << n << " ";
+            total_score += model.get_node(n).score;
+        }
+        std::cout << "; score=" << total_score << "; T=" << visit_duration[path_id] << std::endl; 
+    }   
+}
+
+void IteratedLocalSearch::_test_construct(){
+    std::cout << "#paths : " << NB_PATHS << std::endl;
+        
+    reset_visit_sequences();
+    auto t0 = std::chrono::high_resolution_clock::now();
+    single_pass_construct();
+    solving_duration = std::chrono::high_resolution_clock::now() - t0;
+    print_solutions();
+    std::cout << "test single-pass-construct done in : " << solving_duration.count()  << std::endl;
+
+    reset_visit_sequences();
+    t0 = std::chrono::high_resolution_clock::now();
+    multi_pass_construct();
+    solving_duration = std::chrono::high_resolution_clock::now() - t0;
+    print_solutions();
+    std::cout << "test multi-pass-construct done in : " << solving_duration.count() << std::endl;
 }
