@@ -50,6 +50,7 @@ namespace oplib::solver{
         inline void set_nb_paths(int nb_paths){NB_PATHS=nb_paths;};
 
         void _test_construct();
+        void _test_remove_subseq();
 
     private:
         model::OrienteeringModel& model;
@@ -81,12 +82,21 @@ namespace oplib::solver{
         void check_acceptance_criterion();
 
         void reset_visit_sequences();
+        
+        // ---- INSERT 
+        
         // Try the insertion of `node_id` into the `position` in `path_id`, and return the time_shift if possible, otherwise `INT_MAX`
         int eval_insertion(int node_id, int path_id, int position); 
         void push_move_insert(int node_id, int path_id, int position, int time_shift);
         // Insert `node_id` into into the `position` in `path_id`, but requires invoking `eval_insertion` before applying insertion. 
         void insert_node(int node_id, int path_id, int position, int shift_time);
         
+        // ---- PERTURB
+
+        // (simplified-shake) Remove several nodes from the visit sequence, given the starting `shake_pos` and removal size `shake_len`
+        // if the removal_pos + removal len > last index, just skip i.e. removal_len = min(removal_len, last_pos - removal_pos)
+        void remove_subseq(int path_id, int removal_pos, int removal_len);
+
         // Select a move from `restricted_feasible_moves` using Random Wheel Selection (RWS)
         custom_types::heuristic_move select_next_move();
 

@@ -116,6 +116,7 @@ void IteratedLocalSearch::multi_pass_construct(){
 void IteratedLocalSearch::perturb(){
     std::cout << "destroy sol\n";
     // TODO
+
 }
 
 void IteratedLocalSearch::check_acceptance_criterion(){
@@ -205,6 +206,28 @@ void IteratedLocalSearch::print_solutions(){
     }   
 }
 
+
+void IteratedLocalSearch::remove_subseq(int path_id, int removal_pos, int removal_len){
+    std::vector<int> & visit_seq = visit_sequences[path_id];
+    if (removal_pos == 0 || removal_pos == visit_seq.size())
+        std::cerr << "Error: Do not remove the depot ! (removal_pos == first or last index) \n";
+        return;
+    // stop the removal process at the last visited node
+    int last_pos = std::min(removal_pos + removal_len, static_cast<int>(visit_seq.size()-1));
+    visit_seq.erase(visit_seq.begin()+removal_pos, visit_seq.begin()+last_pos);
+    
+    // update visit duration from scratch
+    // TODO: incremental update travel duration (only if it is faster)
+    visit_duration[path_id] = 0;
+    for (int i=0; i<visit_seq.size()-1; i++){
+        visit_duration[path_id] += model.get_travel_duration(visit_seq[i], visit_seq[i+1]);
+    }
+
+}
+
+
+// =================================================================
+
 void IteratedLocalSearch::_test_construct(){
     std::cout << "#paths : " << NB_PATHS << std::endl;
         
@@ -221,4 +244,24 @@ void IteratedLocalSearch::_test_construct(){
     solving_duration = std::chrono::high_resolution_clock::now() - t0;
     print_solutions();
     std::cout << "test multi-pass-construct done in : " << solving_duration.count() << std::endl;
+}
+
+void IteratedLocalSearch::_test_remove_subseq(){
+    std::cout << "#paths : " << NB_PATHS << std::endl;
+        
+    reset_visit_sequences();
+    auto t0 = std::chrono::high_resolution_clock::now();
+    single_pass_construct();
+    solving_duration = std::chrono::high_resolution_clock::now() - t0;
+    print_solutions();
+    std::cout << "single-pass-construct done in : " << solving_duration.count()  << std::endl;
+
+    if (visit_sequences[0].size() < 6)
+        remove_subseq(0, 1, 3);
+    else
+        remove_subseq(0, 5, 3);
+
+    print_solutions();
+    std::cout << "Removal done\n";
+
 }

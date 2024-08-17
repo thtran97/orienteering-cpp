@@ -66,7 +66,8 @@ int main(int argc, char** argv){
     ils_solver.set_timeout(timeout);
     ils_solver.set_nb_paths(nb_paths);
     // ils_solver.solve();
-    ils_solver._test_construct();
+    // ils_solver._test_construct();
+    ils_solver._test_remove_subseq();
     std::cout << "[INFO:main] Done\n";
     return 0;
 }
