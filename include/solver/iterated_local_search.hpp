@@ -49,6 +49,8 @@ namespace oplib::solver{
         inline void set_timeout(double timeout){TIMEOUT_DURATION=timeout* 1000.;};
         inline void set_nb_paths(int nb_paths){NB_PATHS=nb_paths;};
 
+        int get_total_scores();
+
         void _test_construct();
         void _test_remove_subseq();
 
@@ -82,6 +84,7 @@ namespace oplib::solver{
         void check_acceptance_criterion();
 
         void reset_visit_sequences();
+        void set_visit_sequences(std::vector<std::vector<int>> & new_visit_sequences);
         
         // ---- INSERT 
         

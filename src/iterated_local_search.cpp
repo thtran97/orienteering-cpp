@@ -9,13 +9,47 @@ using namespace oplib::solver;
 
 void IteratedLocalSearch::solve(){
     std::cout << "[INFO::solver] Solving model...\n";
+    int iter = 0;
+    int perturb_index = 1;
+    int perturb_length = 1;
+    
     start_ts = std::chrono::high_resolution_clock::now();
     reset_visit_sequences();
     single_pass_construct();
+    int best_score = get_total_scores();
+    std::vector<std::vector<int>> best_solution = visit_sequences;
+    std::cout << "Initial score: " << best_score << std::endl;
     do {
-        perturb();
+        iter++;
+        // Pertubation
+        for (int i=0; i<NB_PATHS; i++){
+            remove_subseq(i, perturb_index, perturb_length);
+        }
+        
+        perturb_index += perturb_length;
+        if (perturb_index >= visit_sequences[0].size()){
+            perturb_index = 1;
+            perturb_length++;
+        }
+        int start_score = get_total_scores();
+
+        // local search      
         multi_pass_construct();
-        check_acceptance_criterion();
+        int local_score = get_total_scores();
+        
+        std::cout << "Iter " << iter << ": " << start_score << " -> " << local_score << std::endl;
+
+        // Check acceptance criterion
+        int current_score = get_total_scores();
+        if (current_score > best_score){
+            best_score = current_score;
+            best_solution = visit_sequences;
+            std::cout << "[New best score]: " << best_score << std::endl;
+        }
+        else{
+            // reset to the best solution
+            set_visit_sequences(best_solution);
+        }
     } while (!is_timeout_reached());
     std::cout << "[INFO::solver] Solving finished.\n";
 }
@@ -25,9 +59,17 @@ bool IteratedLocalSearch::is_timeout_reached(){
     return solving_duration.count() >= TIMEOUT_DURATION;    
 }
 
+/**
+ * @brief Performs a single-pass construction heuristic for the iterated local search algorithm.
+ * 
+ * This function attempts to construct a solution by iteratively evaluating and inserting nodes in a random order.
+ * For each node, the function evaluates all possible insertions into each path and selects the best insertion in a greedy randomized way.
+ * The process continues until all nodes are evaluated. 
+ * 
+ * Complexity: O(N*M*M)
+ */
 void IteratedLocalSearch::single_pass_construct(){
-    // O(N*M*M)
-    std::cout << "single-pass-construction \n";
+    // std::cout << "single-pass-construction \n";
     // Generate a random order of nodes
     std::vector<int> selectable(NB_NODES);
     for (int i=0; i<NB_NODES; i++)
@@ -64,9 +106,18 @@ void IteratedLocalSearch::single_pass_construct(){
     }
 }
 
+/**
+ * @brief Performs a multi-pass construction heuristic for the iterated local search algorithm.
+ * 
+ * This function attempts to construct a solution by iteratively evaluating and inserting nodes until no more moves are possible.
+ * For each unvisited node, the function evaluates all possible insertions into each path and selects the best insertion in a greedy randomized way.
+ * If a move is found, the function applies the move and marks the node as visited. The process continues until no more moves are possible.
+ * Compared to the single-pass construction, this function is more likely to find a better solution but is also more computationally expensive
+ *
+ * Complexity: O(N*N*M*M)
+ */
 void IteratedLocalSearch::multi_pass_construct(){
-    // O(N*N*M*M)
-    std::cout << "multi-pass-construction\n";
+    // std::cout << "multi-pass-construction\n";
     std::vector<bool> is_visited;
     is_visited.assign(NB_NODES, false);
     for (int path_id=0; path_id<NB_PATHS; path_id++){
@@ -116,7 +167,6 @@ void IteratedLocalSearch::multi_pass_construct(){
 void IteratedLocalSearch::perturb(){
     std::cout << "destroy sol\n";
     // TODO
-
 }
 
 void IteratedLocalSearch::check_acceptance_criterion(){
@@ -135,6 +185,20 @@ void IteratedLocalSearch::reset_visit_sequences(){
             visit_sequences[path_id].clear();
         visit_sequences[path_id] = {model.get_starting_id(), model.get_ending_id()};
         visit_duration[path_id] = model.get_travel_duration(model.get_starting_id(), model.get_ending_id());
+    }
+}
+
+void IteratedLocalSearch::set_visit_sequences(std::vector<std::vector<int>> & new_visit_sequences){
+    if (new_visit_sequences.size() != NB_PATHS){
+        std::cerr << "Error: new visit sequences must have the same number of paths\n";
+        exit(1);
+    }
+    visit_sequences = new_visit_sequences;
+    for (int path_id=0; path_id<NB_PATHS; path_id++){
+        visit_duration[path_id] = 0;
+        for (int i=0; i<visit_sequences[path_id].size()-1; i++){
+            visit_duration[path_id] += model.get_travel_duration(visit_sequences[path_id][i], visit_sequences[path_id][i+1]);
+        }
     }
 }
 
@@ -194,19 +258,6 @@ void IteratedLocalSearch::insert_node(int node_id, int path_id, int position, in
     visit_duration[path_id] += shift_time;
 }
 
-void IteratedLocalSearch::print_solutions(){
-    for (int path_id = 0; path_id < NB_PATHS; path_id++){
-        std::cout << "#" << path_id << ": ";
-        int total_score = 0;
-        for (int n: visit_sequences[path_id]){
-            std::cout << n << " ";
-            total_score += model.get_node(n).score;
-        }
-        std::cout << "; score=" << total_score << "; T=" << visit_duration[path_id] << std::endl; 
-    }   
-}
-
-
 void IteratedLocalSearch::remove_subseq(int path_id, int removal_pos, int removal_len){
     std::vector<int> & visit_seq = visit_sequences[path_id];
     if (removal_pos == 0 || removal_pos == visit_seq.size())
@@ -222,8 +273,30 @@ void IteratedLocalSearch::remove_subseq(int path_id, int removal_pos, int remova
     for (int i=0; i<visit_seq.size()-1; i++){
         visit_duration[path_id] += model.get_travel_duration(visit_seq[i], visit_seq[i+1]);
     }
-
 }
+
+int IteratedLocalSearch::get_total_scores(){
+    int total_score = 0;
+    for (int path_id = 0; path_id < NB_PATHS; path_id++){
+        for (int n: visit_sequences[path_id]){
+            total_score += model.get_node(n).score;
+        }
+    }
+    return total_score;
+}
+
+void IteratedLocalSearch::print_solutions(){
+    for (int path_id = 0; path_id < NB_PATHS; path_id++){
+        std::cout << "#" << path_id << ": ";
+        int total_score = 0;
+        for (int n: visit_sequences[path_id]){
+            std::cout << n << " ";
+            total_score += model.get_node(n).score;
+        }
+        std::cout << "; score=" << total_score << "; T=" << visit_duration[path_id] << std::endl; 
+    }   
+}
+
 
 
 // =================================================================

@@ -6,6 +6,10 @@
 - [ ] Config debugger
 
 
+# Logs
+
+- Current bug in perturb function 
+
 # CMake notes
 
 ```python
