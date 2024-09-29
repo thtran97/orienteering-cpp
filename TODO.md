@@ -1,8 +1,9 @@
 # TODO lists
 
-- [ ] Add data & implement `parser` 
-- [ ] Implement package `model`
-- [ ] Implement package `solver`
+- [x] Add data & implement `parser` 
+- [x] Implement package `model`
+- [x] Implement package `solver`
+- [ ] Config debugger
 
 
 # CMake notes
