@@ -9,7 +9,7 @@ namespace oplib::io {
 
 /**
  * @brief Parser for TTDP instances (multi-day TOPTW-like instances).
- * TTDP for Tourist Trip Design Problem, modeled as a time-dependent OPTW with multiple routes (one per day)
+ * TTDP for Tourist Trip Design Problem
  */
 class TTDPParser : public InstanceParser {
 public:
