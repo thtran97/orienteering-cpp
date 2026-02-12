@@ -12,9 +12,10 @@ Lightweight C++ library and examples for solving multiple variants of Orienteeri
 ## Configure & build
 
 ```bash
-cmake -S . -B build                 # configure
-cmake --build build                 # build
-cmake --build build --target test   # run tests
+cmake -S . -B build                 					# configure
+cmake --build build                 					# build
+cmake --build build --target test_orienteeringLib -j4   # build tests
+./build/tests/test_orienteeringLib                      # run tests
 ```
 
 Use `-GNinja` with `cmake` if you prefer Ninja builds.
