@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "core/constants.h"
 #include "model/problem.h"
 #include "model/solution.h"
 
@@ -12,8 +13,9 @@ namespace oplib::solver {
  * @brief Base class for all solver parameters.
  */
 struct SolverConfig {
-    int seed = DEFAULT_SEED;
-    double max_cpu_time = DEFAULT_TIMELIMIT_SECONDS;
+    int seed = oplib::constants::DEFAULT_SEED;
+    double max_cpu_time = oplib::constants::DEFAULT_TIMELIMIT_SECONDS;
+    int max_iterations = oplib::constants::DEFAULT_MAX_ITERATIONS;
     bool verbose = false;
 };
 
