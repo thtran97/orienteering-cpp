@@ -14,7 +14,7 @@ public:
         : OPProblem(std::move(name), budget), num_vehicles(num_vehicles) {}
 
     bool is_multi_vehicle() const override { return num_vehicles > 1; }
-    int get_num_vehicles() const { return num_vehicles; }
+    int get_num_vehicles() const override { return num_vehicles; }
 
 private:
     int num_vehicles;

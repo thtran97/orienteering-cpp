@@ -24,17 +24,17 @@ public:
     virtual NodeId get_num_nodes() const = 0;
     virtual NodeId get_source_depot() const = 0;
     virtual NodeId get_sink_depot() const = 0;
+    virtual int get_num_vehicles() const { return 1; } 
 
     // Scaling and Precision
     virtual ScalingMode get_scaling_mode() const { return ScalingMode::RAW; }
     virtual double get_time_scale() const { return 1.0; }
     bool is_scaled() const { return get_scaling_mode() == ScalingMode::SCALED_INTEGER; }
 
-    // Rewards and Costs
+    // Core Data Access
     virtual Reward get_reward(NodeId i) const = 0;
     virtual Distance get_distance(NodeId i, NodeId j) const = 0;
 
-    
     // Abstract check for problem-specific constraints
     // This allows checkers/solvers to work with base types
     virtual bool has_time_windows() const { return false; }  // each node has a time window
