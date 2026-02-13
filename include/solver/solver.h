@@ -2,8 +2,9 @@
 
 #include <memory>
 #include <string>
-#include "../model/problem.h"
-#include "../model/solution.h"
+
+#include "model/problem.h"
+#include "model/solution.h"
 
 namespace oplib::solver {
 
