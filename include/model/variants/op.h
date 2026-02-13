@@ -36,7 +36,8 @@ public:
     Distance get_distance(NodeId i, NodeId j) const override { return distance_matrix[i][j]; }
 
     // Constants
-    Distance get_budget() const { return budget; }
+    Distance get_budget() const override { return budget; }
+    Time get_time_budget() const override { return budget; } 
 
     // Builders
     void add_node(const Node& node) { nodes.push_back(node); }
@@ -76,7 +77,7 @@ public:
             for (size_t j = 0; j < n; ++j) {
                 if (i == j) continue;
                 
-                // Basic budget pruning for OP (ignoring TW here)
+                // Basic budget pruning for OP
                 bool feasible = true;
                 Distance dist_ij = get_distance(i, j);
                 Distance dist_to_sink = get_distance(j, sink);

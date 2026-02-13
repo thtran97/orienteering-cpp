@@ -31,15 +31,22 @@ public:
     virtual double get_time_scale() const { return 1.0; }
     bool is_scaled() const { return get_scaling_mode() == ScalingMode::SCALED_INTEGER; }
 
-    // Core Data Access
-    virtual Reward get_reward(NodeId i) const = 0;
-    virtual Distance get_distance(NodeId i, NodeId j) const = 0;
-
     // Abstract check for problem-specific constraints
     // This allows checkers/solvers to work with base types
     virtual bool has_time_windows() const { return false; }  // each node has a time window
     virtual bool is_time_dependent() const { return false; } // travel times depend on departure time
     virtual bool is_multi_vehicle() const { return false; }  // multiple routes/vehicles allowed
+    
+    // Reward and distance
+    virtual Reward get_reward(NodeId i) const = 0;
+    virtual Distance get_distance(NodeId i, NodeId j) const = 0;
+
+    // Constraint budgets (for constructive heuristics and feasibility checking)
+    // Returns the maximum budget allowed for distance/time. Default is unconstrained.
+    virtual Distance get_budget() const { return 1e18; }
+    
+    // Time budget for time-window constrained problems (available time to complete tour)
+    virtual Time get_time_budget() const { return 1e18; }
     
     // Constraints & Metadata (only relevant for problems with time windows)
     virtual const TimeWindow& get_time_window(NodeId i) const { return default_time_window; }
