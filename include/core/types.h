@@ -8,11 +8,10 @@ namespace oplib {
 // Basic semantic types for clarity
 using NodeId = int32_t;
 using Reward = double;
-using Distance = double;
-using Time = double;
+using Time = double;  // Cost to travel from i to j; also available time budget
 
 /**
- * @brief Defines how distances and times are handled in the model.
+ * @brief Defines how time values are scaled in the model.
  */
 enum class ScalingMode {
     RAW,           // Use raw double-precision Euclidean distances

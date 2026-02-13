@@ -11,11 +11,11 @@ namespace oplib::model::variants {
 
 /**
  * @brief Concrete implementation of the Orienteering Problem (OP).
- * Single vehicle, limited by a distance/cost budget.
+ * Single vehicle, limited by a time budget.
  */
 class OPProblem : public Problem {
 public:
-    OPProblem(std::string name, Distance budget)
+    OPProblem(std::string name, Time budget)
         : name(std::move(name)), budget(budget) {}
 
     // Problem interface
@@ -33,19 +33,18 @@ public:
     }
 
     Reward get_reward(NodeId i) const override { return nodes[i].reward; }
-    Distance get_distance(NodeId i, NodeId j) const override { return distance_matrix[i][j]; }
+    Time get_distance(NodeId i, NodeId j) const override { return travel_time_matrix[i][j]; }
 
     // Constants
-    Distance get_budget() const override { return budget; }
-    Time get_time_budget() const override { return budget; } 
+    Time get_budget() const override { return budget; } 
 
     // Builders
     void add_node(const Node& node) { nodes.push_back(node); }
     
-    // Finalize the problem by computing the distance matrix 
+    // Finalize the problem by computing the travel time matrix 
     void finalize() {
         size_t n = nodes.size();
-        distance_matrix.assign(n, std::vector<Distance>(n, 0.0));
+        travel_time_matrix.assign(n, std::vector<Time>(n, 0.0));
         for (size_t i = 0; i < n; ++i) {
             for (size_t j = 0; j < n; ++j) {
                 double dx = nodes[i].x - nodes[j].x;
@@ -53,9 +52,9 @@ public:
                 double raw_dist = std::sqrt(dx*dx + dy*dy);
                 
                 if (scaling_mode == ScalingMode::SCALED_INTEGER) {
-                    distance_matrix[i][j] = std::floor(raw_dist * time_scale);
+                    travel_time_matrix[i][j] = std::floor(raw_dist * time_scale);
                 } else {
-                    distance_matrix[i][j] = raw_dist;
+                    travel_time_matrix[i][j] = raw_dist;
                 }
             }
         }
@@ -79,17 +78,17 @@ public:
                 
                 // Basic budget pruning for OP
                 bool feasible = true;
-                Distance dist_ij = get_distance(i, j);
-                Distance dist_to_sink = get_distance(j, sink);
+                Time travel_time_ij = get_distance(i, j);
+                Time travel_time_to_sink = get_distance(j, sink);
                 
-                if (dist_ij + dist_to_sink > budget) {
+                if (travel_time_ij + travel_time_to_sink > budget) {
                     feasible = false;
                 }
 
                 if (feasible) {
                     // Heuristic value: reward / travel_time
                     // Using service_time of i + travel_time of ij
-                    double heuristic = static_cast<double>(get_reward(j)) / (get_service_time(i) + dist_ij + 1e-6);
+                    double heuristic = static_cast<double>(get_reward(j)) / (get_service_time(i) + travel_time_ij + 1e-6);
                     nodes[i].neighbors.push_back({static_cast<NodeId>(j), heuristic});
                 } else {
                     allowed_arcs[i][j] = false;
@@ -109,13 +108,13 @@ public:
     }
 
 protected:
-    std::string name;                                   // instance name
-    Distance budget;                                    // maximum allowed travel distance/cost
-    ScalingMode scaling_mode = ScalingMode::RAW;        // Scaling mode for distances (affects get_distance and heuristic calculations)
-    double time_scale = 1.0;                            // Scale factor for distances when using SCALED_INTEGER mode      
-    std::vector<Node> nodes;                            // list of nodes (including depots)
-    std::vector<std::vector<Distance>> distance_matrix; // precomputed distance matrix for efficiency
-    std::vector<std::vector<bool>> allowed_arcs;        // pruned arc matrix
+    std::string name;                                      // instance name
+    Time budget;                                           // maximum allowed time budget
+    ScalingMode scaling_mode = ScalingMode::RAW;           // Scaling mode for time values (affects get_distance and heuristic calculations)
+    double time_scale = 1.0;                               // Scale factor for time when using SCALED_INTEGER mode      
+    std::vector<Node> nodes;                               // list of nodes (including depots)
+    std::vector<std::vector<Time>> travel_time_matrix;     // precomputed travel time matrix for efficiency
+    std::vector<std::vector<bool>> allowed_arcs;           // pruned arc matrix
 };
 
 } // namespace oplib::model::variants

@@ -6,11 +6,11 @@ namespace oplib::model::variants {
 
 /**
  * @brief Concrete implementation of the Orienteering Problem with Time Windows (OPTW).
- * Single vehicle, distance budget, and time window constraints.
+ * Single vehicle, time budget, and time window constraints.
  */
 class OPTWProblem : public OPProblem {
 public:
-    OPTWProblem(std::string name, Distance budget)
+    OPTWProblem(std::string name, Time budget)
         : OPProblem(std::move(name), budget) {}
 
     bool has_time_windows() const override { return true; }
@@ -36,14 +36,14 @@ public:
             for (size_t j = 0; j < n; ++j) {
                 if (i == j) continue;
 
-                Distance dist_ij = get_distance(i, j);
+                Time travel_time_ij = get_distance(i, j);
                 const auto& tw_j = get_time_window(j);
                 
                 bool feasible = true;
                 
                 // Arrive at j before closing?
                 double early_depart_i = tw_i.opening + service_i;
-                double arrival_j = early_depart_i + dist_ij;
+                double arrival_j = early_depart_i + travel_time_ij;
                 if (arrival_j > tw_j.closing) feasible = false;
 
                 if (feasible) {
@@ -54,7 +54,7 @@ public:
                 }
 
                 if (feasible) {
-                    double heuristic = static_cast<double>(get_reward(j)) / (service_i + dist_ij + 1e-6);
+                    double heuristic = static_cast<double>(get_reward(j)) / (service_i + travel_time_ij + 1e-6);
                     nodes[i].neighbors.push_back({static_cast<NodeId>(j), heuristic});
                 } else {
                     allowed_arcs[i][j] = false;

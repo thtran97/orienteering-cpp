@@ -14,12 +14,12 @@ namespace oplib::model {
 struct OPArc {
     NodeId source_id;
     NodeId dest_id;
-    Distance dist; // transition time
+    Time travel_time;  // travel time from source to dest
     
     // (detour_node, latest_departure_from_source)
     std::vector<std::pair<NodeId, Time>> detours;
 
-    OPArc(NodeId s, NodeId d, Distance dist) : source_id(s), dest_id(d), dist(dist) {}
+    OPArc(NodeId s, NodeId d, Time travel_time) : source_id(s), dest_id(d), travel_time(travel_time) {}
     
     void sort_detours() {
         std::sort(detours.begin(), detours.end(), [](const auto& a, const auto& b) {

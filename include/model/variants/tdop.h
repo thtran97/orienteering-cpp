@@ -12,7 +12,7 @@ namespace oplib::model::variants {
  */
 class TDOPProblem : public OPProblem {
 public:
-    TDOPProblem(std::string name, Distance budget)
+    TDOPProblem(std::string name, Time budget)
         : OPProblem(std::move(name), budget) {}
 
     bool is_time_dependent() const override { return true; }

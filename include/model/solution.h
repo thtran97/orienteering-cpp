@@ -29,8 +29,7 @@ public:
 
     // ==== Solution Metadata ====
     Reward total_reward = 0.0;
-    Time total_time = 0.0;
-    Distance total_distance = 0.0;
+    Time total_travel_time = 0.0;  // Total time to traverse all routes
 
     // ==== Utility ====
 
@@ -40,8 +39,7 @@ public:
             route.clear();
         }
         total_reward = 0.0;
-        total_time = 0.0;
-        total_distance = 0.0;
+        total_travel_time = 0.0;
     }
 
     // Checks if all routes are empty

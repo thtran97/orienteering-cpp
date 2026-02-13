@@ -9,7 +9,6 @@ namespace oplib::constants {
 // Numeric Constants
 inline constexpr NodeId INVALID_NODE = -1;
 inline constexpr Reward UNSET_REWARD = -1.0;
-inline constexpr Distance INF_DISTANCE = 1e18; // Use a large double instead of INT_MAX for doubles
 inline constexpr Time INF_TIME = 1e18;
 
 // Default Algorithm Parameters

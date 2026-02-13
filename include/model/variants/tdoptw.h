@@ -41,7 +41,7 @@ public:
     }
 
     // Setters for free flow travel times 
-    void set_free_flow_matrix(std::vector<std::vector<Distance>> matrix) {
+    void set_free_flow_matrix(std::vector<std::vector<Time>> matrix) {
         free_flow_matrix = std::move(matrix);
     }
 
@@ -81,7 +81,7 @@ private:
     std::vector<std::vector<std::vector<double>>> coeff_b;
 
     // Optional free flow travel times
-    std::vector<std::vector<Distance>> free_flow_matrix;
+    std::vector<std::vector<Time>> free_flow_matrix;
 };
 
 } // namespace oplib::model::variants

@@ -8,7 +8,7 @@ namespace oplib::model {
 
 std::string OPArc::to_string() const {
     std::stringstream ss;
-    ss << "Arc(" << source_id << "->" << dest_id << ") dist=" << dist << " detours={";
+    ss << "Arc(" << source_id << "->" << dest_id << ") travel_time=" << travel_time << " detours={";
     for (const auto& d : detours) {
         ss << "(" << d.first << "," << d.second << ") ";
     }
@@ -123,7 +123,7 @@ bool OPGraph::arc_feasible(NodeId i, NodeId j, Time start_i) const {
     if (!adjacency_matrix[i][j]) return false;
     
     const OPArc* arc = get_arc(i, j);
-    Time arrival_j = start_i + nodes[i].service_time + arc->dist;
+    Time arrival_j = start_i + nodes[i].service_time + arc->travel_time;
     return arrival_j <= nodes[j].closing;
 }
 
@@ -131,7 +131,7 @@ Time OPGraph::get_earliest_start(NodeId i, NodeId j, Time start_i) const {
     if (!adjacency_matrix[i][j]) return -1.0;
     
     const OPArc* arc = get_arc(i, j);
-    Time arrival_j = start_i + nodes[i].service_time + arc->dist;
+    Time arrival_j = start_i + nodes[i].service_time + arc->travel_time;
     if (arrival_j > nodes[j].closing) return -1.0;
     
     return std::max(arrival_j, nodes[j].opening);

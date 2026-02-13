@@ -37,23 +37,20 @@ public:
     virtual bool is_time_dependent() const { return false; } // travel times depend on departure time
     virtual bool is_multi_vehicle() const { return false; }  // multiple routes/vehicles allowed
     
-    // Reward and distance
+    // Reward
     virtual Reward get_reward(NodeId i) const = 0;
-    virtual Distance get_distance(NodeId i, NodeId j) const = 0;
-
+    
     // Constraint budgets (for constructive heuristics and feasibility checking)
-    // Returns the maximum budget allowed for distance/time. Default is unconstrained.
-    virtual Distance get_budget() const { return 1e18; }
-    
-    // Time budget for time-window constrained problems (available time to complete tour)
-    virtual Time get_time_budget() const { return 1e18; }
-    
+    // Returns the maximum time budget allowed to complete tour. Default is unconstrained.
+    virtual Time get_budget() const { return 1e18; }
+
     // Constraints & Metadata (only relevant for problems with time windows)
     virtual const TimeWindow& get_time_window(NodeId i) const { return default_time_window; }
     virtual Time get_service_time(NodeId i) const { return 0.0; }
     
     // Logic utilities
     // Default is time-independent, which does not use departure_time. Time-dependent variants should override this.
+    virtual Time get_distance(NodeId i, NodeId j) const = 0;  // Returns travel time from i to j
     virtual Time get_travel_time(NodeId i, NodeId j, Time /*departure_time*/ = 0.0) const {
         return get_distance(i, j); 
     }

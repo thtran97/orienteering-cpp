@@ -43,13 +43,13 @@ TEST_F(OPParserTest, ChaoSetTest) {
         EXPECT_GE(problem->get_reward(i), 0);
     }
     
-    // Verify distances are non-negative and symmetric
+    // Verify travel times are non-negative and symmetric
     for (NodeId i = 0; i < problem->get_num_nodes(); ++i) {
         for (NodeId j = 0; j < problem->get_num_nodes(); ++j) {
-            Distance d_ij = problem->get_distance(i, j);
-            Distance d_ji = problem->get_distance(j, i);
-            EXPECT_GE(d_ij, 0) << "Distance from " << i << " to " << j << " is negative";
-            EXPECT_EQ(d_ij, d_ji) << "Distance matrix is not symmetric";
+            Time t_ij = problem->get_distance(i, j);
+            Time t_ji = problem->get_distance(j, i);
+            EXPECT_GE(t_ij, 0) << "Travel time from " << i << " to " << j << " is negative";
+            EXPECT_EQ(t_ij, t_ji) << "Travel time matrix is not symmetric";
         }
     }
 }

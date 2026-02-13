@@ -6,11 +6,11 @@ namespace oplib::model::variants {
 
 /**
  * @brief Concrete implementation of the Team Orienteering Problem (TOP).
- * Multiple vehicles, each limited by the same distance/cost budget.
+ * Multiple vehicles, each limited by the same time budget.
  */
 class TOPProblem : public OPProblem {
 public:
-    TOPProblem(std::string name, int num_vehicles, Distance budget)
+    TOPProblem(std::string name, int num_vehicles, Time budget)
         : OPProblem(std::move(name), budget), num_vehicles(num_vehicles) {}
 
     bool is_multi_vehicle() const override { return num_vehicles > 1; }
