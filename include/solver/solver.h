@@ -12,9 +12,8 @@ namespace oplib::solver {
  * @brief Base class for all solver parameters.
  */
 struct SolverConfig {
-    int seed = 0;
-    double max_cpu_time = 60.0;
-    int max_iterations = 1000;
+    int seed = DEFAULT_SEED;
+    double max_cpu_time = DEFAULT_TIMELIMIT_SECONDS;
     bool verbose = false;
 };
 
