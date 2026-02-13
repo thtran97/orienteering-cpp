@@ -28,36 +28,31 @@ std::unique_ptr<model::Problem> TTDPParser::read(const std::string& filepath) {
     if (!(file >> std::ws)) {}
 
     // For robustness, rewind to start of nodes parsing by using getline for remaining
-    std::string rest_of_line;
-    std::getline(file, rest_of_line);
+    std::string rest_of_line_from_depot;
+    std::getline(file, rest_of_line_from_depot);
 
-    // Now create TTDPProblem with 7 days and tmax equal to depot closing-opening.
-    // We'll assume 7 days always present in format.
-    double tmax_per_day = 0.0;
+    double time_scale = 10.0; // Solomon default for TTDP
+    double tmax_per_day_raw = 0.0;
     // Try to parse opening/closing from the depot's rest_of_line
     {
-        std::stringstream ss(rest_of_line);
+        std::stringstream ss(rest_of_line_from_depot);
         double maybe0, maybeC;
         if (ss >> maybe0 >> maybeC) {
-            tmax_per_day = maybeC - maybe0;
-            depot_open = maybe0;
-            depot_close = maybeC;
+            tmax_per_day_raw = maybeC - maybe0;
         }
     }
 
-    auto problem = std::make_unique<model::variants::TTDPProblem>(filepath, 7, tmax_per_day);
+    auto problem = std::make_unique<model::variants::TTDPProblem>(filepath, 7, tmax_per_day_raw * time_scale);
+    problem->set_scaling(ScalingMode::SCALED_INTEGER, time_scale);
 
-    // Read N-1 remaining nodes (including depot already read partially)
-    // Re-open the file to parse lines cleanly from the top
+    // Read nodes
     file.clear();
     file.seekg(0);
     std::string line;
-    // skip first header line
-    std::getline(file, line);
-    // read depot full line
-    std::getline(file, line);
+    std::getline(file, line); // header
+    // std::getline(file, line); // depot (will be read again in loop)
 
-    int node_count = 0;
+    std::vector<model::Node> parsed_nodes;
     while (std::getline(file, line)) {
         if (line.empty()) continue;
         std::stringstream ss(line);
@@ -68,9 +63,9 @@ std::unique_ptr<model::Problem> TTDPParser::read(const std::string& filepath) {
         node.id = i;
         node.x = x;
         node.y = y;
-        node.service_time = d;
+        node.service_time = d * time_scale;
         node.reward = S;
-        // read 7 pairs of open/close
+        
         std::vector<double> opens(7), closes(7);
         for (int day = 0; day < 7; ++day) {
             if (!(ss >> opens[day] >> closes[day])) {
@@ -78,14 +73,22 @@ std::unique_ptr<model::Problem> TTDPParser::read(const std::string& filepath) {
                 closes[day] = 0.0;
             }
         }
-        // set time window to the start day windows
         int start_day = SD % 7;
-        node.tw.opening = opens[start_day];
-        node.tw.closing = closes[start_day];
-        problem->add_node(node);
-        ++node_count;
+        node.tw.opening = opens[start_day] * time_scale;
+        node.tw.closing = closes[start_day] * time_scale;
+        parsed_nodes.push_back(node);
     }
 
+    for (const auto& n : parsed_nodes) {
+        problem->add_node(n);
+    }
+    
+    // Virtual sink duplication if format follows TOPTW
+    model::Node sink = parsed_nodes[0];
+    sink.id = static_cast<NodeId>(parsed_nodes.size());
+    problem->add_node(sink);
+
+    // Finalize the problem by computing the distance matrix
     problem->finalize();
     return problem;
 }

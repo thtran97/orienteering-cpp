@@ -37,6 +37,7 @@ std::unique_ptr<model::variants::TDOPTWProblem> TDOPTWParser::read(
     std::ifstream trans_file(transition_matrix_path);
     if (trans_file.is_open()) {
         int nb_slots = 56;
+        double time_step = 900000.0; // 15 mins in ms
         std::vector<std::vector<std::vector<double>>> matrix(nb_customers, std::vector<std::vector<double>>(nb_customers, std::vector<double>(nb_slots)));
         char sep;
         for (int i = 0; i < nb_customers; ++i) {
@@ -47,9 +48,26 @@ std::unique_ptr<model::variants::TDOPTWProblem> TDOPTWParser::read(
             }
         }
         problem->set_transition_matrix(matrix);
-        problem->set_slot_duration(900000.0); // 15 mins in ms
+        problem->set_slot_duration(time_step);
         problem->set_start_time(0.0);
+
+        // Compute coefficients (Legacy logic)
+        std::vector<std::vector<std::vector<double>>> coeff_a(nb_customers, std::vector<std::vector<double>>(nb_customers, std::vector<double>(nb_slots, 0.0)));
+        std::vector<std::vector<std::vector<double>>> coeff_b(nb_customers, std::vector<std::vector<double>>(nb_customers, std::vector<double>(nb_slots, 0.0)));
+
+        for (int i = 0; i < nb_customers; ++i) {
+            for (int j = 0; j < nb_customers; ++j) {
+                for (int k = 0; k < nb_slots - 1; ++k) {
+                    coeff_a[i][j][k] = (matrix[i][j][k+1] - matrix[i][j][k]) / time_step;
+                    coeff_b[i][j][k] = matrix[i][j][k] - coeff_a[i][j][k] * k * time_step;
+                }
+                coeff_a[i][j][nb_slots-1] = 0;
+                coeff_b[i][j][nb_slots-1] = matrix[i][j][nb_slots-1];
+            }
+        }
+        problem->set_coefficients(coeff_a, coeff_b);
     }
+    trans_file.close();
 
     return problem;
 }
