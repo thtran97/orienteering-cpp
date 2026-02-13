@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../core/types.h"
 #include <string>
+
+#include "core/types.h"
 
 namespace oplib::model {
 

@@ -1,8 +1,9 @@
 #pragma once
 
-#include "op.h"
-#include "../../core/routing_utils.h"
 #include <algorithm>
+
+#include "model/variants/op.h"
+#include "core/routing_utils.h"
 
 namespace oplib::model::variants {
 

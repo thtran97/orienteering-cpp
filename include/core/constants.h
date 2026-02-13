@@ -1,7 +1,8 @@
 #pragma once
 
-#include "types.h"
 #include <climits>
+
+#include "types.h"
 
 namespace oplib::constants {
 

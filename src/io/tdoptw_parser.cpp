@@ -1,7 +1,8 @@
-#include "../../include/io/tdoptw_parser.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
+
+#include "io/tdoptw_parser.h"
 
 namespace oplib::io {
 

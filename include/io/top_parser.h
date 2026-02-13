@@ -1,7 +1,10 @@
 #pragma once
 
-#include "instance_parser.h"
-#include "../model/variants/top.h"
+#include <memory>
+#include <string>
+
+#include "io/instance_parser.h"
+#include "model/variants/top.h"
 
 namespace oplib::io {
 

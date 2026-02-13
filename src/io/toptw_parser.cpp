@@ -1,7 +1,8 @@
-#include "../../include/io/toptw_parser.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
+
+#include "io/toptw_parser.h"
 
 namespace oplib::io {
 

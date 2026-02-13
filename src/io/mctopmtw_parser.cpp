@@ -1,8 +1,9 @@
-#include "../../include/io/mctopmtw_parser.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
 #include <vector>
+
+#include "io/mctopmtw_parser.h"
 
 namespace oplib::io {
 

@@ -1,9 +1,10 @@
 #pragma once
 
-#include "instance_parser.h"
-#include "../model/variants/ttdp.h"
 #include <memory>
 #include <string>
+
+#include "io/instance_parser.h"
+#include "model/variants/ttdp.h"
 
 namespace oplib::io {
 

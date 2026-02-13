@@ -1,8 +1,9 @@
-#include "../../include/io/ttdp_parser.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
 #include <vector>
+
+#include "io/ttdp_parser.h"
 
 namespace oplib::io {
 

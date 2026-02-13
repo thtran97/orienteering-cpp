@@ -1,8 +1,9 @@
 #pragma once
 
-#include "../model/variants/tdoptw.h"
 #include <memory>
 #include <string>
+
+#include "model/variants/tdoptw.h"
 
 namespace oplib::io {
 

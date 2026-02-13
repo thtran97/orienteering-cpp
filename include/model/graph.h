@@ -1,12 +1,13 @@
 #pragma once
 
-#include "../core/types.h"
-#include "problem.h"
 #include <vector>
 #include <string>
 #include <memory>
 #include <unordered_map>
 #include <algorithm>
+
+#include "core/types.h"
+#include "model/problem.h"
 
 namespace oplib::model {
 

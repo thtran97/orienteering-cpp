@@ -1,7 +1,8 @@
-#include "../../include/io/op_parser.h"
 #include <fstream>
 #include <sstream>
 #include <iostream>
+
+#include "io/op_parser.h"
 
 namespace oplib::io {
 

@@ -2,7 +2,8 @@
 
 #include <string>
 #include <memory>
-#include "../model/problem.h"
+
+#include "model/problem.h"
 
 namespace oplib::io {
 

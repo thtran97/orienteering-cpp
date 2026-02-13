@@ -1,10 +1,11 @@
 #pragma once
 
-#include "../problem.h"
-#include "../node.h"
 #include <cmath>
 #include <vector>
 #include <algorithm>
+
+#include "model/problem.h"
+#include "model/node.h"
 
 namespace oplib::model::variants {
 

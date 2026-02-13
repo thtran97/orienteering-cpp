@@ -1,10 +1,10 @@
 #pragma once
-
-#include "types.h"
-#include "../model/problem.h"
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+
+#include "types.h"
+#include "model/problem.h"
 
 namespace oplib::utils {
 

@@ -1,7 +1,8 @@
-#include "../../include/model/graph.h"
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+
+#include "model/graph.h"
 
 namespace oplib::model {
 
