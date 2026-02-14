@@ -23,9 +23,7 @@ std::unique_ptr<model::Problem> TOPTWParser::read(const std::string& filepath) {
     int num_vehicles = 0;
     double tmax_raw = 0.0;
 
-    if (std::getline(file, line)) {} // skip line 1
-    if (std::getline(file, line)) {} // skip line 2
-
+    // Line 1: num_vehicles, ???, budget, ???
     if (std::getline(file, line)) {
         std::stringstream ss(line);
         ss >> num_vehicles;
@@ -34,7 +32,10 @@ std::unique_ptr<model::Problem> TOPTWParser::read(const std::string& filepath) {
         ss >> tmax_raw;
     }
 
-    if (std::getline(file, line)) {} // skip line 4
+    // Skip line 2
+    if (std::getline(file, line)) {}  
+    
+    // Line 3 onwards: node data starts here
 
     // Use budget as tmax for TW variants
     auto problem = std::make_unique<model::variants::TOPTWProblem>(filepath, num_vehicles, tmax_raw * time_scale);

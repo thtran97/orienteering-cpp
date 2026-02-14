@@ -3,7 +3,6 @@
 #include <memory>
 #include <set>
 #include "solver/solver.h"
-#include "solver/constructive/feasibility_checker.h"
 #include "solver/constructive/move_evaluator.h"
 
 namespace oplib::solver::constructive {
@@ -16,7 +15,6 @@ namespace oplib::solver::constructive {
  * insertion strategy, move evaluation, and caching.
  */
 struct GreedySolverConfig : public SolverConfig {
-    InsertionStrategyMode insertion_strategy = InsertionStrategyMode::CUSTOMER_WISE;
     MoveEvaluatorType move_evaluator = MoveEvaluatorType::REWARD;
 };
 
@@ -52,6 +50,19 @@ struct InsertionMove {
     Time time_shift = 0.0;          // additional travel time incurred
     Time arrival_time = 0.0;        // computed arrival at customer
     Time departure_time = 0.0;      // computed departure from customer
+};
+
+/**
+ * @brief Result of feasibility checking for an insertion move.
+ * 
+ * Captures whether the move is feasible and the computed costs (travel time and actual time)
+ * that result from the insertion. These costs are needed for move evaluation.
+ */
+struct FeasibilityResult {
+    bool feasible = false;
+    Time arrival_time_at_customer = 0.0;      // arrival time at the inserted customer
+    Time departure_time_from_customer = 0.0;  // departure time after service at customer
+    Time travel_time_cost = 0.0;              // additional travel time incurred by insertion
 };
 
 /**
@@ -111,13 +122,7 @@ private:
  * This heuristic builds routes by iteratively inserting the "best" available 
  * customer into current routes until no more feasible insertions exist.
  * 
- * Key features:
- * - Modular design: pluggable feasibility checking, move evaluation, and insertion strategy
- * - Incremental tracking: maintains arrival/departure times and distances incrementally
- * - Caching: avoids re-evaluating infeasible insertions
- * - Variant support: works with all problem types (OP, OPTW, TOP, TOPTW, TDOP, TDOPTW)
- * 
- * Supports:
+ * Variant supports:
  * - OP: Orienteering Problem (single vehicle, distance budget)
  * - OPTW: OP with Time Windows
  * - TOP: Team Orienteering Problem (multiple vehicles)
@@ -132,9 +137,7 @@ public:
      * 
      * @param strategy_mode Insertion strategy (CUSTOMER_WISE or VEHICLE_WISE)
      */
-    GreedySolver(
-        InsertionStrategyMode strategy_mode = InsertionStrategyMode::CUSTOMER_WISE // TODO: unused for now
-    ) : strategy_mode(strategy_mode) {};
+    GreedySolver(){};
 
     std::string get_name() const override { return "GreedySolver"; }
     
@@ -149,17 +152,8 @@ public:
     model::Solution solve(const model::Problem& problem, const GreedySolverConfig& config);
 
 private:
-    InsertionStrategyMode strategy_mode;
-    std::unique_ptr<FeasibilityChecker> feasibility_checker;
     std::unique_ptr<MoveEvaluator> move_evaluator;
     InfeasibilityCache infeasibility_cache;
-
-    /**
-     * @brief Select appropriate feasibility checker based on problem type.
-     */
-    std::unique_ptr<FeasibilityChecker> select_feasibility_checker(
-        const model::Problem& problem
-    );
 
     /**
      * @brief Find the best insertion move across all unvisited customers and route positions.
@@ -192,6 +186,37 @@ private:
     );
 
     /**
+     * @brief Check if inserting a customer at a given position in a route is feasible using max_shift.
+     * 
+     * Uses the max_shift from the route context to determine feasibility:
+     * - max_shift[pos-1] tracks how much time delay position pos-1 can tolerate
+     * - If insertion causes time_shift <= max_shift[pos-1], it's feasible
+     * - Computes exact arrival/departure times at the inserted customer
+     * 
+     * @return FeasibilityResult with feasibility status and insertion times
+     */
+    FeasibilityResult check_insertion_feasible(
+        const model::Problem& problem,
+        const model::Solution& solution,
+        int vehicle,
+        NodeId customer,
+        int position,
+        const std::vector<RouteContext>& route_contexts
+    ) const;
+
+    /**
+     * @brief Compute arrival and departure times for inserting a customer between two nodes.
+     * 
+     * @return Pair of (arrival_time_at_customer, departure_time_from_customer)
+     */
+    std::pair<Time, Time> compute_insertion_times(
+        const model::Problem& problem,
+        NodeId prev,
+        NodeId customer,
+        Time departure_from_prev
+    ) const;
+
+    /**
      * @brief Apply an insertion move to the solution.
      * 
      * Updates route, arrival/departure times, cumulative distance, and visited flags.
@@ -205,16 +230,6 @@ private:
         std::vector<bool>& visited
     );
 
-    /**
-     * @brief Compute arrival and departure times for inserting a customer between two nodes.
-     */
-    std::pair<Time, Time> compute_arrival_departure_times(
-        const model::Problem& problem,
-        NodeId prev,
-        NodeId customer,
-        NodeId next,
-        Time departure_from_prev
-    );
 };
 
 } // namespace oplib::solver::constructive

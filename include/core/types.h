@@ -37,7 +37,7 @@ struct TimeWindow {
  * 
  * CUSTOMER_WISE: for each customer, evaluate all possible insertions across all vehicles and positions, and pick the best one.
  * 
- * VEHICLE_WISE: for each vehicle, evaluate all possible insertions across all customers and positions, and pick the best one.
+ * VEHICLE_WISE: for each vehicle, insert customers until no more feasible insertions exist, then move to the next vehicle.
  */
 enum class InsertionStrategyMode {
     CUSTOMER_WISE,

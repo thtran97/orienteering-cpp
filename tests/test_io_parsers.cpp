@@ -114,10 +114,11 @@ TEST_F(TOPTWParserTest, SolomonTest) {
     EXPECT_GE(problem->get_source_depot(), 0);
     EXPECT_GE(problem->get_sink_depot(), 0);
     
-    // TOPTW should have time windows
+    // TOPTW should have time windows and be multi-vehicle (Team OP)
     EXPECT_TRUE(problem->has_time_windows());
     EXPECT_FALSE(problem->is_time_dependent());
-    EXPECT_FALSE(problem->is_multi_vehicle());
+    EXPECT_TRUE(problem->is_multi_vehicle());  // TOPTW is Team OP => multi-vehicle
+    EXPECT_GT(problem->get_num_vehicles(), 1); // Should have multiple vehicles
 }
 
 TEST_F(TOPTWParserTest, CordeauTest) {

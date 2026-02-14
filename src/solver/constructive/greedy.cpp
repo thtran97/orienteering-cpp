@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <limits>
 #include <cmath>
+#include <iostream>
 
 #include "solver/constructive/greedy.h"
 #include "core/random.h"
@@ -19,8 +20,7 @@ model::Solution GreedySolver::solve(const model::Problem& problem, const SolverC
 }
 
 model::Solution GreedySolver::solve(const model::Problem& problem, const GreedySolverConfig& config) {
-    // Select appropriate components if not provided at construction based on problem type and config
-    feasibility_checker = select_feasibility_checker(problem);
+    // Initialize move evaluator based on config
     move_evaluator = create_move_evaluator(config.move_evaluator);
 
     // Initialize solution with empty routes and track visited customers
@@ -33,7 +33,7 @@ model::Solution GreedySolver::solve(const model::Problem& problem, const GreedyS
     visited[problem.get_sink_depot()] = true;
 
     // Initialize route contexts for incremental update 
-    // (arrival/departure/shift/budget)
+    // (arrival/departure/max_shift/budget)
     std::vector<RouteContext> route_contexts(num_vehicles);
     
     for (int v = 0; v < num_vehicles; ++v) {
@@ -42,6 +42,7 @@ model::Solution GreedySolver::solve(const model::Problem& problem, const GreedyS
         // Initialize times: at source depot at time 0, at sink depot at time 0 (will be updated)
         route_contexts[v].arrival_times = {0.0, 0.0};
         route_contexts[v].departure_times = {0.0, 0.0};
+        route_contexts[v].max_shift = {std::numeric_limits<Time>::max(), std::numeric_limits<Time>::max()};
         route_contexts[v].cumulative_time = 0.0;
     }
     
@@ -66,20 +67,6 @@ model::Solution GreedySolver::solve(const model::Problem& problem, const GreedyS
     }
     
     return solution;
-}
-
-std::unique_ptr<FeasibilityChecker> GreedySolver::select_feasibility_checker(
-    const model::Problem& problem
-) {
-    if (problem.has_time_windows()) {
-        if (problem.is_time_dependent()) {
-            return std::make_unique<TimeDependentFeasibilityChecker>();
-        } else {
-            return std::make_unique<TimeWindowFeasibilityChecker>();
-        }
-    } else {
-        return std::make_unique<DistanceFeasibilityChecker>();
-    }
 }
 
 InsertionMove GreedySolver::find_best_insertion(
@@ -127,15 +114,8 @@ void GreedySolver::evaluate_insertion_candidate(
         return;  // Skip cached infeasible triplet
     }
     
-    const auto& context = route_contexts[v];
-    
-    // Check feasibility of this insertion
-    // Pass the complete route context: arrival times, departure times, and cumulative time
-    auto feasibility_result = feasibility_checker->check_feasibility(
-        problem, solution, v, c, pos,
-        context.arrival_times, context.departure_times,
-        context.cumulative_time
-    );
+    // Check feasibility of this insertion using max_shift from route context
+    auto feasibility_result = check_insertion_feasible(problem, solution, v, c, pos, route_contexts);
     
     if (!feasibility_result.feasible) {
         infeasibility_cache.mark_infeasible(c, v, pos);
@@ -143,7 +123,7 @@ void GreedySolver::evaluate_insertion_candidate(
     }
     
     // Compute insertion score based on feasibility results
-    // The evaluator uses travel time cost and total time cost to compute the score
+    // The evaluator uses travel time cost to compute the score
     double score = move_evaluator->evaluate(
         problem, c,
         feasibility_result.travel_time_cost
@@ -162,6 +142,111 @@ void GreedySolver::evaluate_insertion_candidate(
     }
 }
 
+FeasibilityResult GreedySolver::check_insertion_feasible(
+    const model::Problem& problem,
+    const model::Solution& solution,
+    int vehicle,
+    NodeId customer,
+    int position,
+    const std::vector<RouteContext>& route_contexts
+) const {
+    FeasibilityResult result;
+    
+    const auto& route = solution.get_route(vehicle);
+    const auto& context = route_contexts[vehicle];
+    
+    // Validate position bounds
+    if (position < 1 || position >= static_cast<int>(route.size())) {
+        result.feasible = false;
+        return result;
+    }
+    
+    NodeId prev = route[position - 1];
+    NodeId next = route[position];
+    Time departure_from_prev = context.departure_times[position - 1];
+    
+    // Compute times for the inserted customer
+    auto [arrival_at_customer, departure_from_customer] = 
+        compute_insertion_times(problem, prev, customer, departure_from_prev);
+    
+    // Check if the customer's time window is violated
+    const auto& tw_customer = problem.get_time_window(customer);
+    if (arrival_at_customer > tw_customer.closing) {
+        result.feasible = false;
+        result.travel_time_cost = 0.0;
+        result.arrival_time_at_customer = arrival_at_customer;
+        return result;
+    }
+    
+    // Compute travel times for cost calculation
+    Time old_travel_time = problem.get_travel_time(prev, next, departure_from_prev);
+    Time new_travel_time_to_customer = problem.get_travel_time(prev, customer, departure_from_prev);
+    Time new_travel_time_from_customer = problem.get_travel_time(customer, next, departure_from_customer);
+    Time travel_time_cost = (new_travel_time_to_customer + new_travel_time_from_customer) - old_travel_time;
+    
+    // Check time budget constraint (if applicable)
+    Time budget = problem.get_budget();
+    if (context.cumulative_time + travel_time_cost > budget) {
+        result.feasible = false;
+        result.travel_time_cost = travel_time_cost;
+        return result;
+    }
+    
+    if (problem.has_time_windows()){
+        // Check if next node can still be reached within its time window
+        Time arrival_at_next = departure_from_customer + new_travel_time_from_customer;
+        const auto& tw_next = problem.get_time_window(next);
+        
+        if (arrival_at_next > tw_next.closing) {
+            result.feasible = false;
+            result.travel_time_cost = travel_time_cost;
+            result.arrival_time_at_customer = arrival_at_customer;
+            result.departure_time_from_customer = departure_from_customer;
+            return result;
+        }
+        
+        // Optional: Check max_shift constraint if available
+        // max_shift[position-1] indicates how much delay that node can tolerate
+        if (position > 0 && context.max_shift[position - 1] < std::numeric_limits<Time>::max()) {
+            Time time_shift = (departure_from_customer + new_travel_time_from_customer) - 
+                            (departure_from_prev + old_travel_time);
+            // Allow small numerical tolerance
+            if (time_shift > context.max_shift[position - 1] + 1e-6) {
+                result.feasible = false;
+                result.travel_time_cost = travel_time_cost;
+                result.arrival_time_at_customer = arrival_at_customer;
+                result.departure_time_from_customer = departure_from_customer;
+                return result;
+            }
+        }
+    }
+    
+    // All constraints satisfied
+    result.feasible = true;
+    result.travel_time_cost = travel_time_cost;
+    result.arrival_time_at_customer = arrival_at_customer;
+    result.departure_time_from_customer = departure_from_customer;
+    return result;
+}
+
+std::pair<Time, Time> GreedySolver::compute_insertion_times(
+    const model::Problem& problem,
+    NodeId prev,
+    NodeId customer,
+    Time departure_from_prev
+) const {
+    // Compute arrival times using the problem's travel time function
+    Time travel_time = problem.get_travel_time(prev, customer, departure_from_prev);
+    Time arrival_at_customer = departure_from_prev + travel_time;
+    
+    // Respect time window opening
+    const auto& tw = problem.get_time_window(customer);
+    Time start_service = std::max(arrival_at_customer, tw.opening);
+    Time departure_from_customer = start_service + problem.get_service_time(customer);
+    
+    return {arrival_at_customer, departure_from_customer};
+}
+
 
 void GreedySolver::apply_insertion(
     const model::Problem& problem,
@@ -173,21 +258,15 @@ void GreedySolver::apply_insertion(
     // Insert customer into route
     auto& route = solution.get_route(move.vehicle);
     auto& context = route_contexts[move.vehicle];
-    
     route.insert(route.begin() + move.position, move.customer);
     
-    // Insert arrival and departure times at the insertion point
-    context.arrival_times.insert(
-        context.arrival_times.begin() + move.position,
-        move.arrival_time
-    );
-    context.departure_times.insert(
-        context.departure_times.begin() + move.position,
-        move.departure_time
-    );
+    // Also insert time tracking vectors at insertion point
+    context.arrival_times.insert(context.arrival_times.begin() + move.position, move.arrival_time);
+    context.departure_times.insert(context.departure_times.begin() + move.position, move.departure_time);
+    context.max_shift.insert(context.max_shift.begin() + move.position, 0.0);
     
-    // Update contexts of all successor nodes incrementally
-    // The departure time from the inserted customer propagates downstream
+    // Update successors and incrementally update their max_shift
+    // Forward pass: propagate time downstream and compute max_shift until shift becomes 0
     for (int i = move.position + 1; i < static_cast<int>(route.size()); ++i) {
         NodeId prev_node = route[i - 1];
         NodeId curr_node = route[i];
@@ -205,6 +284,34 @@ void GreedySolver::apply_insertion(
         // Update the context for this successor
         context.arrival_times[i] = arrival_time;
         context.departure_times[i] = departure_time;
+        
+        // Update max_shift for successor:
+        // max_shift[i] indicates how much slack is available before violating downstream constraints
+        // This is the slack at the time window closing minus current departure time
+        Time slack = tw.closing - departure_time;
+        context.max_shift[i] = slack;
+        
+        // If slack becomes 0 or negative, successor nodes can't shift further
+        if (slack <= 0.0) {
+            break;
+        }
+    }
+    
+    // Backward pass: update max_shift for predecessors
+    // Each predecessor's max_shift is limited by its successor's slack and its own time window
+    for (int i = move.position - 1; i >= 0; --i) {
+        const auto& tw_curr = problem.get_time_window(route[i]);
+        // Max shift is limited by successor's max shift
+        Time max_shift_from_successor = context.max_shift[i + 1];
+        // And also limited by available slack in current node's time window
+        Time own_slack = tw_curr.closing - context.departure_times[i];
+        context.max_shift[i] = std::min(max_shift_from_successor, own_slack);
+        
+        // If max_shift becomes 0, predecessors have no flexibility
+        if (context.max_shift[i] < 0.0) {
+            std::cerr << "Warning: max_shift became negative at position " << i << " in vehicle " << move.vehicle << std::endl;
+            throw std::runtime_error("Negative max_shift indicates an error in time window calculations");
+        }
     }
     
     // Update cumulative time
@@ -212,28 +319,6 @@ void GreedySolver::apply_insertion(
     
     // Mark as visited
     visited[move.customer] = true;
-    
-    // Invalidate cache entries for inserted customer
-    infeasibility_cache.invalidate_customer(move.customer);
-}
-
-std::pair<Time, Time> GreedySolver::compute_arrival_departure_times(
-    const model::Problem& problem,
-    NodeId prev,
-    NodeId customer,
-    NodeId next,
-    Time departure_from_prev
-) {
-    // Compute arrival times using feasibility checker's logic
-    Time travel_time_prev_to_c = problem.get_travel_time(prev, customer, departure_from_prev);
-    Time arrival_at_c = departure_from_prev + travel_time_prev_to_c;
-    
-    // Respect time window opening
-    const auto& tw_c = problem.get_time_window(customer);
-    Time start_service = std::max(arrival_at_c, tw_c.opening);
-    Time departure_from_c = start_service + problem.get_service_time(customer);
-    
-    return {arrival_at_c, departure_from_c};
 }
 
 } // namespace oplib::solver::constructive
