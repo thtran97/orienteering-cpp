@@ -33,13 +33,6 @@ Use `-GNinja` with `cmake` if you prefer Ninja builds.
 
 ## Usage
 
-Typical workflow:
-
-1. Write or use an existing parser to load an OP instance from `data/`.
-2. Create an OP model (defined in `include/core` / `src/orienteering_model.cpp`).
-3. Choose a solver from `src/solver`, configure parameters, and run
-	the solver to generate solutions.
-
 See `examples/` for small runnable examples demonstrating setup and
 execution.
 

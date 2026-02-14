@@ -1,86 +1,75 @@
 #include <iostream>
-#include <fstream>
-#include "model/orienteering_model.hpp"
-#include "solver/iterated_local_search.hpp"
-#include "utils/argument_parser.hpp"
-
-#define DEFAULT_TIME_FACTOR 100
+#include <memory>
+#include <string>
+#include "io/op_parser.h"
+#include "model/problem.h"
+#include "model/solution.h"
+#include "solver/solver.h"
+#include "solver/local_search/LNS.h"
 
 using namespace oplib;
 
+/*
+ * Main function for solving Orienteering Problem instances.
+ * Usage: ./solve_op -file path/to/instance [-seed 0] [-timeout 60.0]
+ */
+int main(int argc, char** argv) {
+    // Simple argument parsing (avoid dependency on missing ArgParser)
+    std::string filename;
+    int seed = 0;
+    double timeout = 60.0;
 
-// Parse the instance file: instance file format : data/op/OP_format.txt
-// Return the number of paths used in the instance
-
-int parse_instance(model::OrienteeringModel & op_model, std::string file, int time_factor=DEFAULT_TIME_FACTOR){
-
-    // parse your instance here
-    std::cout << "[INFO::main] Parsing instance : " << file << "\n"; 
-    std::ifstream infile(file);
-    if (!infile){
-        std::cerr << "Error: unable to open file " << file << std::endl;
-        exit(1);
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "-file" && i + 1 < argc) {
+            filename = argv[++i];
+        } else if (arg == "-seed" && i + 1 < argc) {
+            seed = std::stoi(argv[++i]);
+        } else if (arg == "-timeout" && i + 1 < argc) {
+            timeout = std::stod(argv[++i]);
+        }
     }
 
-    // [optional] set instance_name for summary
-    op_model.instance_name = file.substr(file.find_last_of("/\\") + 1);
-    
-    // See description in data/op/OP_format.txt 
-    // read first line
-    double original_tmax;
-    int nb_paths;
-    infile >> original_tmax >> nb_paths;
-    if  (nb_paths < 1){
-        std::cerr << "Error: number of paths used must be positive" << std::endl;
-        exit(1);
+    if (filename.empty()) {
+        std::cerr << "Usage: ./solve_op -file <instance_file> [-seed <seed>] [-timeout <seconds>]\n";
+        return 1;
     }
 
-    op_model.set_time_budget(original_tmax * time_factor);
-    // read point data
-    while (!infile.eof()){
-        double x, y;
-        int score;
-        infile >> x >> y >> score;
-        op_model.add_node(x, y, score);
+    // Load instance using OPParser (supports Chao format for OP)
+    io::OPParser reader;
+    std::unique_ptr<model::Problem> problem = reader.read(filename);
+
+    if (!problem) {
+        std::cerr << "Error: Could not read instance file: " << filename << std::endl;
+        return 1;
     }
-    op_model.set_starting_point(0);
-    op_model.set_ending_point(1);
 
-    // [IMPORTANT] Compute the travel matrix
-    op_model.update_travel_duration_matrix(time_factor);
-    infile.close();
-    return nb_paths;
-}
+    std::cout << "[INFO::main] Problem: " << problem->get_name() << "\n";
+    std::cout << "[INFO::main] Nodes: " << problem->get_num_nodes() << "\n";
 
+    // Configure solver: use existing LNS solver
+    oplib::solver::local_search::LNSSolver lns_solver;
+    oplib::solver::SolverConfig config;
+    config.seed = seed;
+    config.max_cpu_time = timeout;
+    config.verbose = true;
 
-// Main function
-// Usage: ./solve_op -file data/op/OP_format.txt -seed 0 -timeout 0.0
-
-int main(int argc, char** argv){
-
-    // Parse arguments
-    utils::ArgParser arg_parser(argv, argv + argc);
-    
-    // Parse instance from file
-    model::OrienteeringModel op_model; 
-    char * filename = arg_parser.getCmdOption("-file"); 
-    if (!filename) std::cout << "Require instance file !\n";
-    int nb_paths = parse_instance(op_model, filename);
-    op_model.print_summary();
-
-    // Create solver and set solving parameters
-    solver::IteratedLocalSearch ils_solver(op_model);
-    int seed = arg_parser.getCmdInt("-seed", 0);
-    ils_solver.set_seed(seed);
-    double timeout = arg_parser.getCmdDouble("-timeout", 0.0);
-    ils_solver.set_timeout(timeout);
-    ils_solver.set_nb_paths(nb_paths);
-    
     // Solve the problem
-    ils_solver.solve();
-    // ils_solver._test_construct();
-    // ils_solver._test_remove_subseq();
-    ils_solver.print_solutions();
-    // std::cout << "[INFO:main] Done\n";
+    model::Solution best_sol = lns_solver.solve(*problem, config);
+
+    // Print results
+    std::cout << "\n[INFO::main] Best Solution Found:\n";
+    std::cout << "Total Reward: " << best_sol.total_reward << "\n";
+    std::cout << "Total Travel Time: " << best_sol.total_travel_time << "\n";
+
+    const auto& routes = best_sol.get_routes();
+    for (size_t i = 0; i < routes.size(); ++i) {
+        std::cout << "Route " << i << ": ";
+        for (auto node_id : routes[i]) {
+            std::cout << node_id << " ";
+        }
+        std::cout << std::endl;
+    }
+
     return 0;
 }
