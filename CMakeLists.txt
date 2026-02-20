@@ -2,7 +2,10 @@
 cmake_minimum_required(VERSION 3.14...3.29)
 
 # Project name and a few useful settings. Other commands can pick up the results
-project(genopLib)
+project(orienteering-cpp)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 message("----------------------------------------")
 message("[INFO] Start configuring project ${PROJECT_NAME}: ${CMAKE_SOURCE_DIR}")

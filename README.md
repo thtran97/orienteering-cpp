@@ -1,43 +1,42 @@
 # Orienteering Problem Solver Library
 
-This is an Orienteering project using CMake.
+Lightweight C++ library and examples for solving multiple variants of Orienteering Problem (OP) instances.
+
+## Requirements
+
+- CMake 3.11+ (3.14+ recommended)
+- A C++17-compatible compiler (g++, clang++)
+- Boost (header-only parts are sufficient)
+- Git
 
 ## Configure & build
 
-The requirements are:
-
-- CMake 3.11 or better; 3.14+ highly recommended.
-- A C++17 compatible compiler
-- The Boost libararies (header only part is fine)
-- Git
-
-To configure:
-
 ```bash
-cmake -S . -B build
+cmake -S . -B build                 					# configure
+cmake --build build                 					# build
+cmake --build build --target test_orienteeringLib -j4   # build tests
+./build/tests/test_orienteeringLib                      # run tests
 ```
 
-Add `-GNinja` if you have Ninja.
+Use `-GNinja` with `cmake` if you prefer Ninja builds.
 
-To build:
+## Repository layout
 
-```bash
-cmake --build build
-```
+- `build/` — out-of-source CMake build directory (generated after configuration)
+- `cmake/` — CMake modules and configuration files
+- `data/` — problem instances and datasets (not included in repo, to be added by users)
+- `docs/` — documentation and design notes
+- `examples/` — example programs and small runners
+- `include/` — public headers
+- `src/` — library implementation and internal components
+- `tests/` — unit tests and test runners
 
-To test (`--target` can be written as `-t` in CMake 3.15+):
+## Usage
 
-```bash
-cmake --build build --target test
-```
+See `examples/` for small runnable examples demonstrating setup and
+execution.
 
-## Code structure
+## Contributing
 
-- `model` package defines key attributes of an OP model
-- `solver` package defines various solvers for solving the OP model
-- `utils` package defines several necessary tools
-
-## How is an OP problem solved using this library ? 
-
-Scripts will be written in `examples` folder. 
-Users need to define a custom parser to read the input instance file, load important data and then create an OP model from that. Then, users can choose a solver, define parameters and launch the resolution procedure.
+Contributions are welcome. Please follow the existing CMake layout and
+add small, focused changes with tests where appropriate.
