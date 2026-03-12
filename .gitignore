@@ -35,3 +35,8 @@
 build/*
 .vscode/*
 data/*
+
+# Output files
+results/*
+logs/*
+*.csv

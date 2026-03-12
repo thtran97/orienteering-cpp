@@ -18,7 +18,7 @@ using namespace oplib::model;
 
 // Helper function to construct data file path
 std::string get_data_path(const std::string& relative_path) {
-    return fs::path(__FILE__).parent_path().parent_path() / "data" / relative_path;
+    return (fs::path(__FILE__).parent_path().parent_path() / "data" / relative_path).string();
 }
 
 // ============================================================================
