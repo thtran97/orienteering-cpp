@@ -2,6 +2,7 @@
 #include <limits>
 #include <cmath>
 #include <iostream>
+#include <tuple>
 
 #include "solver/constructive/greedy.h"
 #include "core/random.h"
@@ -94,6 +95,63 @@ InsertionMove GreedySolver::find_best_insertion(
     return best_move;
 }
 
+std::vector<InsertionMove> GreedySolver::find_all_feasible_insertions(
+    const model::Problem& problem,
+    const model::Solution& solution,
+    const std::vector<bool>& visited,
+    const std::vector<RouteContext>& route_contexts
+) {
+    std::vector<InsertionMove> all_moves;
+    int num_vehicles = problem.get_num_vehicles();
+    
+    for (int v = 0; v < num_vehicles; ++v) {
+        for (NodeId c = 0; c < problem.get_num_nodes(); ++c) {
+            if (visited[c]) continue;
+            if (c == problem.get_source_depot() || c == problem.get_sink_depot()) continue;
+
+            const auto& route = solution.get_route(v);
+            for (int pos = 1; pos < static_cast<int>(route.size()); ++pos) {
+                // Check cache
+                if (infeasibility_cache.is_infeasible(c, v, pos)) {
+                    continue;
+                }
+                
+                // Check feasibility
+                auto feasibility_result = check_insertion_feasible(problem, solution, v, c, pos, route_contexts);
+                
+                if (!feasibility_result.feasible) {
+                    infeasibility_cache.mark_infeasible(c, v, pos);
+                    continue;
+                }
+                
+                // Compute score
+                double score = move_evaluator->evaluate(
+                    problem, c,
+                    feasibility_result.travel_time_cost
+                );
+                
+                InsertionMove move;
+                move.customer = c;
+                move.vehicle = v;
+                move.position = pos;
+                move.score = score;
+                move.feasible = true;
+                move.arrival_time = feasibility_result.arrival_time_at_customer;
+                move.departure_time = feasibility_result.departure_time_from_customer;
+                move.time_shift = feasibility_result.travel_time_cost;
+                
+                all_moves.push_back(move);
+            }
+        }
+    }
+    
+    // Sort by score descending
+    std::sort(all_moves.begin(), all_moves.end(),
+        [](const InsertionMove& a, const InsertionMove& b) { return a.score > b.score; });
+    
+    return all_moves;
+}
+
 void GreedySolver::evaluate_insertion_candidate(
     InsertionMove& best_move,
     NodeId c,
@@ -166,8 +224,9 @@ FeasibilityResult GreedySolver::check_insertion_feasible(
     Time departure_from_prev = context.departure_times[position - 1];
     
     // Compute times for the inserted customer
-    auto [arrival_at_customer, departure_from_customer] = 
-        compute_insertion_times(problem, prev, customer, departure_from_prev);
+    auto times = compute_insertion_times(problem, prev, customer, departure_from_prev);
+    Time arrival_at_customer = std::get<0>(times);
+    Time departure_from_customer = std::get<1>(times);
     
     // Check if the customer's time window is violated
     const auto& tw_customer = problem.get_time_window(customer);
@@ -247,6 +306,112 @@ std::pair<Time, Time> GreedySolver::compute_insertion_times(
     return {arrival_at_customer, departure_from_customer};
 }
 
+
+RouteContext GreedySolver::rebuild_route_context(
+    const model::Problem& problem,
+    const std::vector<NodeId>& route
+) const {
+    RouteContext ctx;
+    ctx.arrival_times.clear();
+    ctx.departure_times.clear();
+    ctx.max_shift.clear();
+    ctx.cumulative_time = 0.0;
+    
+    if (route.empty()) return ctx;
+    
+    // Forward pass: compute arrival/departure times for each node in route
+    for (size_t i = 0; i < route.size(); ++i) {
+        NodeId node = route[i];
+        
+        if (i == 0) {
+            // Source depot: arrive at time 0
+            ctx.arrival_times.push_back(0.0);
+            ctx.departure_times.push_back(0.0);
+        } else {
+            // Compute arrival from predecessor
+            NodeId prev_node = route[i - 1];
+            Time departure_from_prev = ctx.departure_times[i - 1];
+            Time travel_time = problem.get_travel_time(prev_node, node, departure_from_prev);
+            Time arrival_at_node = departure_from_prev + travel_time;
+            
+            // Respect time window opening
+            const auto& tw = problem.get_time_window(node);
+            Time start_service = std::max(arrival_at_node, tw.opening);
+            Time departure_from_node = start_service + problem.get_service_time(node);
+            
+            ctx.arrival_times.push_back(arrival_at_node);
+            ctx.departure_times.push_back(departure_from_node);
+        }
+    }
+    
+    // Backward pass: compute max_shift for each position
+    ctx.max_shift.assign(route.size(), std::numeric_limits<Time>::max());
+    
+    for (int i = static_cast<int>(route.size()) - 1; i >= 0; --i) {
+        const auto& tw = problem.get_time_window(route[i]);
+        Time slack = tw.closing - ctx.departure_times[i];
+        
+        if (i == static_cast<int>(route.size()) - 1) {
+            // Last position: slack from its time window
+            ctx.max_shift[i] = slack;
+        } else {
+            // Limited by successor's max_shift and own slack
+            ctx.max_shift[i] = std::min(ctx.max_shift[i + 1], slack);
+        }
+    }
+    
+    // Cumulative travel time: sum of travel costs
+    for (size_t i = 1; i < route.size(); ++i) {
+        NodeId prev = route[i - 1];
+        NodeId curr = route[i];
+        Time departure_from_prev = ctx.departure_times[i - 1];
+        ctx.cumulative_time += problem.get_travel_time(prev, curr, departure_from_prev);
+    }
+    
+    return ctx;
+}
+
+model::Solution GreedySolver::solve_from_partial(
+    const model::Problem& problem,
+    model::Solution partial_solution,
+    const GreedySolverConfig& config
+) {
+    move_evaluator = create_move_evaluator(config.move_evaluator);
+    
+    int num_vehicles = problem.get_num_vehicles();
+    std::vector<bool> visited(problem.get_num_nodes(), false);
+    
+    // Mark depots as visited
+    visited[problem.get_source_depot()] = true;
+    visited[problem.get_sink_depot()] = true;
+    
+    // Reconstruct route contexts from partial solution
+    std::vector<RouteContext> route_contexts(num_vehicles);
+    for (int v = 0; v < num_vehicles; ++v) {
+        const auto& route = partial_solution.get_route(v);
+        route_contexts[v] = rebuild_route_context(problem, route);
+        
+        // Mark nodes in this route as visited
+        for (int i = 1; i < static_cast<int>(route.size()) - 1; ++i) {
+            visited[route[i]] = true;
+        }
+    }
+    
+    infeasibility_cache.clear();
+    
+    // Continue greedy insertion from partial solution
+    while (true) {
+        auto best_move = find_best_insertion(problem, partial_solution, visited, route_contexts);
+        if (!best_move.feasible) break;
+        
+        apply_insertion(problem, partial_solution, best_move, route_contexts, visited);
+        
+        partial_solution.total_reward += problem.get_reward(best_move.customer);
+        partial_solution.total_travel_time += best_move.time_shift;
+    }
+    
+    return partial_solution;
+}
 
 void GreedySolver::apply_insertion(
     const model::Problem& problem,

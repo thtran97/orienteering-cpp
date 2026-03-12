@@ -151,7 +151,20 @@ public:
      */
     model::Solution solve(const model::Problem& problem, const GreedySolverConfig& config);
 
-private:
+    /**
+     * @brief Continue greedy construction from a partial (pre-filled) solution.
+     * 
+     * Reconstructs RouteContext from the existing routes, marks those nodes as
+     * visited, then continues the standard greedy insertion loop.
+     * Used by LNS repair to re-fill a solution after a destroy step.
+     */
+    model::Solution solve_from_partial(
+        const model::Problem& problem,
+        model::Solution partial_solution,
+        const GreedySolverConfig& config
+    );
+
+protected:
     std::unique_ptr<MoveEvaluator> move_evaluator;
     InfeasibilityCache infeasibility_cache;
 
@@ -184,6 +197,8 @@ private:
         const model::Solution& solution,
         const std::vector<RouteContext>& route_contexts
     );
+
+public:
 
     /**
      * @brief Check if inserting a customer at a given position in a route is feasible using max_shift.
@@ -230,6 +245,34 @@ private:
         std::vector<bool>& visited
     );
 
-};
+    /**
+     * @brief Find all feasible insertion candidates for the current solution.
+     * 
+     * Generates all (customer, vehicle, position) triplets and evaluates their feasibility.
+     * Returns all feasible moves sorted by score (highest first).
+     */
+    std::vector<InsertionMove> find_all_feasible_insertions(
+        const model::Problem& problem,
+        const model::Solution& solution,
+        const std::vector<bool>& visited,
+        const std::vector<RouteContext>& route_contexts
+    );
+
+    /**
+     * @brief Rebuild RouteContext from an existing route.
+     * 
+     * Traverses a route and recomputes all arrival_times, departure_times, and max_shift values.
+     * Called by solve_from_partial to initialize context for partially-filled solutions.
+     * 
+     * FUTURE OPTIMIZATION: Instead of rebuilding from scratch, we could incrementally update
+     * the route context of the partial solution based on the context of the full solution
+     * (before destroy). This would be more efficient than full traversal.
+     */
+    RouteContext rebuild_route_context(
+        const model::Problem& problem,
+        const std::vector<NodeId>& route
+    ) const;
+
+}; // class GreedySolver
 
 } // namespace oplib::solver::constructive
