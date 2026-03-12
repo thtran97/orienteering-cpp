@@ -8,3 +8,12 @@ target_link_libraries(solve_op orienteeringLib)
 
 add_executable(benchmark_greedy benchmark_greedy.cpp)
 target_link_libraries(benchmark_greedy orienteeringLib)
+
+add_executable(benchmark_randomized_greedy benchmark_randomized_greedy.cpp)
+target_link_libraries(benchmark_randomized_greedy orienteeringLib)
+
+add_executable(benchmark_lns benchmark_lns.cpp)
+target_link_libraries(benchmark_lns orienteeringLib)
+
+add_executable(benchmark_grasp benchmark_grasp.cpp)
+target_link_libraries(benchmark_grasp orienteeringLib)

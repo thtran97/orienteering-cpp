@@ -1,6 +1,11 @@
 # Works with 3.14 and tested through 3.29
 cmake_minimum_required(VERSION 3.14...3.29)
 
+# Use vcpkg toolchain if available (Windows)
+if(WIN32 AND DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "vcpkg toolchain")
+endif()
+
 # Project name and a few useful settings. Other commands can pick up the results
 project(orienteering-cpp)
 
