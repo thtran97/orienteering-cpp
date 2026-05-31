@@ -1,6 +1,6 @@
 # Orienteering Problem Solver Library
 
-Lightweight C++ library and examples for solving multiple variants of Orienteering Problem (OP) instances.
+This is an Orienteering project using CMake, which aims to develop solvers for solving variants of Orienteering problems.
 
 ## Requirements
 
