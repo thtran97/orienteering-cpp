@@ -208,7 +208,14 @@ model::Solution MCTSSolver::solve(const model::Problem&   problem,
     auto* root = new MCTSNode(problem.get_source_depot(), nullptr, root_vis);
     root->nb_simulations = 1;
 
+    // Initialise best with a valid empty solution (correct number of routes)
+    // so callers can safely call get_route(v) even when MCTS finds nothing.
     model::Solution best;
+    {
+        std::vector<bool> init_vis;
+        std::vector<local_search::RouteContext> init_ctx;
+        ls.init(best, init_vis, init_ctx);
+    }
     auto t_start = Clock::now();
 
     for (int iter = 0; iter < config.max_iterations; ++iter) {

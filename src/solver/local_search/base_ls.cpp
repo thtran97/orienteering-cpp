@@ -394,19 +394,14 @@ void BaseLSUtils::shake(model::Solution& solution,
     std::vector<NodeId> to_remove;
     to_remove.reserve(removal_len);
 
+    // Collect consecutive customer positions starting at `position`, wrapping
+    // circularly around the customer segment [1, num_customers].
     for (int k = 0; k < removal_len; ++k) {
-        // position wraps: ((position - 1 + k) % num_customers) + 1
-        // But since we're removing as we go, just remove at `position` repeatedly.
-        // If position goes out of bounds (after erasures), wrap to 1.
-        int cur_pos = position;
-        const int cur_rsz = static_cast<int>(route.size());
-        const int cur_customers = cur_rsz - 2;
-        if (cur_customers <= 0) break;
-        if (cur_pos >= cur_rsz - 1) cur_pos = 1;
-
+        int cur_pos = ((position - 1 + k) % num_customers) + 1;
         to_remove.push_back(route[cur_pos]);
     }
 
+    // Remove by node ID (std::find) because earlier removals shift indices.
     for (NodeId removed : to_remove) {
         auto& rt = solution.get_route(vehicle);
         auto it  = std::find(rt.begin() + 1, rt.end() - 1, removed);

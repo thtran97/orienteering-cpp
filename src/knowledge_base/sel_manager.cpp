@@ -189,7 +189,7 @@ void Constraint::backpropagate_lt(std::vector<int>& backpropagated_assignment) {
                 Constraint* c = x->involving_constraints[j];
                 if (!c->less_than_ct) continue;
                 int idx_c = x->involving_constraints_pos[j];
-                if (c->slack < coeff[idx_c]) {
+                if (c->slack < c->coeff[idx_c]) {
                     possible = false;
                     break;
                 }
