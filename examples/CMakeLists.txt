@@ -17,3 +17,12 @@ target_link_libraries(benchmark_lns orienteeringLib)
 
 add_executable(benchmark_grasp benchmark_grasp.cpp)
 target_link_libraries(benchmark_grasp orienteeringLib)
+
+add_executable(benchmark benchmark.cpp)
+target_link_libraries(benchmark orienteeringLib)
+
+add_executable(benchmark_all benchmark_all.cpp)
+target_link_libraries(benchmark_all orienteeringLib)
+
+add_executable(benchmark_exact benchmark_exact.cpp)
+target_link_libraries(benchmark_exact orienteeringLib)

@@ -1,54 +1,42 @@
 #pragma once
 
-#include <vector>
-#include <memory>
-
 #include "solver/solver.h"
-#include "solver/constructive/greedy.h"
-#include "core/random.h"
+#include "solver/local_search/base_ls.h"
 
 namespace oplib::solver::constructive {
 
 /**
- * @brief Configuration for RandomizedGreedy solver.
- * 
- * Extends SolverConfig with RandomizedGreedy-specific parameters.
+ * @brief Configuration for the randomized greedy solver.
+ *
+ * Uses the restricted candidate list (RCL) heuristic: at each step a
+ * candidate is drawn randomly from the top-rcl_size insertions weighted
+ * by their heuristic score = reward^alpha / (time_shift + eps).
  */
-struct RandomizedGreedyConfig : public SolverConfig {
-    double alpha = 0.3;  // RCL parameter: controls randomness [0, 1]
-                         // 0 = greedy (only best moves), 1 = random (all feasible moves)
+struct RandomizedGreedySolverConfig : public SolverConfig {
+    int    alpha    = oplib::constants::DEFAULT_ALPHA;    // reward exponent
+    int    rcl_size = oplib::constants::DEFAULT_RCL_SIZE; // RCL capacity
 };
 
 /**
- * @brief Randomized Greedy Solver using Restricted Candidate List (RCL).
- * 
- * Extends GreedySolver to reuse insertion infrastructure (move_evaluator,
- * infeasibility_cache, apply_insertion, find_all_feasible_insertions).
+ * @brief Multi-start randomized greedy constructive solver.
  *
- * At each construction step, all feasible insertions are gathered and an RCL
- * is formed from those scoring within alpha of the best. A move is then
- * randomly selected from the RCL.
+ * On each of max_iterations restarts:
+ *  1. Reset the solution to empty depot routes.
+ *  2. Call BaseLSUtils::repair() to greedily fill routes using the RCL.
+ * Returns the best solution found across all restarts.
  *
- * - alpha = 0.0: pure greedy (only best move is in RCL)
- * - alpha = 1.0: fully random (all feasible moves are in RCL)
+ * This solver unblocks benchmark_randomized_greedy.cpp and serves as a
+ * stand-alone baseline as well as the construction phase of GRASP+VNS.
  */
-class RandomizedGreedySolver : public GreedySolver {
+class RandomizedGreedySolver : public Solver {
 public:
-    std::string get_name() const override { return "Randomized Greedy"; }
+    std::string get_name() const override { return "RandomizedGreedy"; }
 
-    model::Solution solve(const model::Problem& problem, const SolverConfig& config) override;
+    model::Solution solve(const model::Problem& problem,
+                          const SolverConfig&   config) override;
 
-    /**
-     * @brief Solve with RandomizedGreedy-specific configuration.
-     */
-    model::Solution solve(const model::Problem& problem, const RandomizedGreedyConfig& config);
-
-private:
-    model::Solution construct_randomized_greedy(
-        const model::Problem& problem,
-        const SolverConfig& config,
-        utils::Random& rng,
-        double alpha);
+    model::Solution solve(const model::Problem&              problem,
+                          const RandomizedGreedySolverConfig& config);
 };
 
 } // namespace oplib::solver::constructive

@@ -13,7 +13,7 @@ file(GLOB_RECURSE orienteeringLib_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 add_library(orienteeringLib STATIC ${orienteeringLib_SOURCE})
 
 # Define include directories
-target_include_directories(orienteeringLib PUBLIC ${CMAKE_SOURCE_DIR}/include) 
+target_include_directories(orienteeringLib PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
 # Find Boost
 find_package(Boost QUIET COMPONENTS serialization)

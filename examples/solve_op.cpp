@@ -5,7 +5,7 @@
 #include "model/problem.h"
 #include "model/solution.h"
 #include "solver/solver.h"
-#include "solver/local_search/LNS.h"
+#include "solver/metaheuristic/lns.h"
 
 using namespace oplib;
 
@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     std::cout << "[INFO::main] Nodes: " << problem->get_num_nodes() << "\n";
 
     // Configure solver: use existing LNS solver
-    oplib::solver::local_search::LNSSolver lns_solver;
+    oplib::solver::metaheuristic::LNSSolver lns_solver;
     oplib::solver::SolverConfig config;
     config.seed = seed;
     config.max_cpu_time = timeout;
