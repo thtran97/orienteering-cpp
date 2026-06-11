@@ -83,6 +83,10 @@ CPLEX/CUDD/CryptoMiniSat goes behind an OFF-by-default CMake option.
 - [x] Fix the build break; collapse overlapping benchmarks onto
       `benchmark_all` / `benchmark_exact`.
 - [x] Add comprehensive solver × variant tests (≥ 1 instance per variant).
+- [x] Commit a curated test-data subset (~32 KB, force-added from toptwLib's
+      identically-structured `data/`) so the IO/parser and real-instance tests
+      pass. The large `singlesat/` set (~103 MB) is excluded and its parser test
+      skips when absent. All other `data/` stays git-ignored.
 - [ ] Sync docs (README to describe the real solver suite; fold in `CLAUDE.md`).
 - [ ] Port dependency-free `utils/` (`custom_queue`, `comparator`, `hash`,
       `argument_parser`) + a solver registry/CLI so new solvers are instantly
