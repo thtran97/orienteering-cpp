@@ -99,11 +99,15 @@ void PulseSolver::pulse(NodeId node, SearchState& state) const
 model::Solution PulseSolver::solve(const model::Problem& problem,
                                     const SolverConfig&   config)
 {
+    // Forward to the typed overload, preserving PulseSolverConfig defaults
+    // (max_labels = 1 000 000).  Keeping it unlimited (0) here would make
+    // every call via the base Solver interface potentially run forever on
+    // large instances.
     PulseSolverConfig ps_cfg;
-    ps_cfg.seed        = config.seed;
+    ps_cfg.seed         = config.seed;
     ps_cfg.max_cpu_time = config.max_cpu_time;
-    ps_cfg.max_labels  = 0; // unlimited by default when called via base interface
-    ps_cfg.verbose     = config.verbose;
+    ps_cfg.verbose      = config.verbose;
+    // ps_cfg.max_labels   retains its default (1 000 000)
     return solve(problem, ps_cfg);
 }
 

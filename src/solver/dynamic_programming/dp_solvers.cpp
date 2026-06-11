@@ -179,27 +179,48 @@ std::vector<Reward> BackwardDPSolver::compute_bounds(const model::Problem& probl
     const int    nn   = static_cast<int>(problem.get_num_nodes());
     const NodeId sink = problem.get_sink_depot();
 
-    // ub[i] = max reward collectable starting from node i and reaching sink
-    // Simple bound: relaxation ignoring visited constraints (additive DP on sorted TW).
-    // For each node i compute the remaining reward reachable via a greedy backward pass.
+    // ub[i] = max reward collectable starting from node i and reaching sink.
+    // Relaxation that ignores visited-node constraints (so it is an upper bound).
+    //
+    // Two improvements over a naive single-pass:
+    //  1. Budget-awareness: arcs (i,j) whose minimum detour already exceeds
+    //     the budget are excluded, keeping the bound tight and preventing
+    //     it from including infeasible detours.
+    //  2. Tie-breaking by distance to sink: when TW closing times are equal
+    //     (e.g. in plain OP where all windows are [0,∞)), nodes closer to
+    //     the sink are processed first.  This ensures their ub values are
+    //     available when we compute ub for nodes farther from the sink,
+    //     avoiding drastic underestimates that would cause incorrect pruning.
     std::vector<Reward> ub(nn, 0.0);
 
-    // Process nodes in reverse topological order by latest TW start
+    const Time budget = problem.get_budget();
+
     std::vector<int> order(nn);
     std::iota(order.begin(), order.end(), 0);
-    std::sort(order.begin(), order.end(), [&](int a, int b){
-        return problem.get_time_window(a).closing > problem.get_time_window(b).closing;
+    std::sort(order.begin(), order.end(), [&](int a, int b) {
+        double ca = problem.get_time_window(a).closing;
+        double cb = problem.get_time_window(b).closing;
+        if (std::abs(ca - cb) > 1e-9) return ca > cb;   // larger closing first
+        // tie-break: closer to sink first (more "backward" in the route)
+        return problem.get_distance(a, sink) < problem.get_distance(b, sink);
     });
 
     for (int i : order) {
         if (i == sink) { ub[i] = 0.0; continue; }
         Reward best = 0.0;
+        Time dep_i = problem.get_time_window(i).opening
+                     + problem.get_service_time(i);
         for (int j = 0; j < nn; ++j) {
             if (j == i) continue;
-            Time dep_i = problem.get_time_window(i).opening
-                         + problem.get_service_time(i);
             Time arr_j = dep_i + problem.get_travel_time(i, j, dep_i);
             if (arr_j > problem.get_time_window(j).closing) continue;
+            // Budget check: dep_i + travel(i→j) + service(j) + travel(j→sink)
+            // must not exceed the total budget (using earliest possible departure
+            // from i as the most optimistic assumption).
+            Time dep_j = std::max(arr_j, problem.get_time_window(j).opening)
+                         + problem.get_service_time(j);
+            Time arr_sink = dep_j + problem.get_travel_time(j, sink, dep_j);
+            if (arr_sink > budget) continue;
             Reward cand = problem.get_reward(j) + ub[j];
             best = std::max(best, cand);
         }
