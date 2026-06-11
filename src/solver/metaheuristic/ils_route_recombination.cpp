@@ -76,6 +76,94 @@ void ILSRouteRecombinationSolver::add_to_pool(std::vector<model::Solution>& pool
 }
 
 // ---------------------------------------------------------------------------
+// Helper: recompute visited flags + per-vehicle RouteContext for a solution
+// ---------------------------------------------------------------------------
+
+void ILSRouteRecombinationSolver::rebuild_bookkeeping(
+    local_search::BaseLSUtils&                ls,
+    const model::Problem&                     problem,
+    const model::Solution&                    sol,
+    std::vector<bool>&                        visited,
+    std::vector<local_search::RouteContext>&  ctx)
+{
+    const int nn = static_cast<int>(problem.get_num_nodes());
+    const int nv = problem.get_num_vehicles();
+    visited.assign(nn, false);
+    ctx.assign(nv, local_search::RouteContext{});
+    for (int v = 0; v < nv; ++v) {
+        for (NodeId n : sol.get_route(v)) visited[n] = true;
+        ls.recompute_context(sol.get_route(v), ctx[v]);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Route recombination: max-weight set-packing over the pool's routes
+// ---------------------------------------------------------------------------
+
+model::Solution ILSRouteRecombinationSolver::recombine_routes(
+    const model::Problem&               problem,
+    const std::vector<model::Solution>& pool,
+    local_search::BaseLSUtils&          ls,
+    const local_search::LSConfig&       ls_cfg)
+{
+    const int    nv   = problem.get_num_vehicles();
+    const int    nn   = static_cast<int>(problem.get_num_nodes());
+    const NodeId src  = problem.get_source_depot();
+    const NodeId sink = problem.get_sink_depot();
+
+    // 1. Gather candidate routes (customer subsequences) from every pool member.
+    struct Candidate { Reward reward; std::vector<NodeId> customers; };
+    std::vector<Candidate> candidates;
+    for (const auto& sol : pool) {
+        for (int v = 0; v < sol.get_num_vehicles(); ++v) {
+            const auto& r = sol.get_route(v);
+            if (r.size() <= 2) continue;  // depot-only route
+            std::vector<NodeId> customers(r.begin() + 1, r.end() - 1);
+            Reward reward = 0.0;
+            for (NodeId c : customers) reward += problem.get_reward(c);
+            candidates.push_back({reward, std::move(customers)});
+        }
+    }
+
+    // 2. Greedily pick the highest-reward customer-disjoint routes (set packing).
+    std::sort(candidates.begin(), candidates.end(),
+              [](const Candidate& a, const Candidate& b) { return a.reward > b.reward; });
+
+    model::Solution   recombined(nv);
+    std::vector<bool> used(nn, false);
+    Reward            placed_reward = 0.0;
+    int               assigned      = 0;
+
+    for (const auto& cand : candidates) {
+        if (assigned >= nv) break;
+        bool conflict = false;
+        for (NodeId c : cand.customers)
+            if (used[c]) { conflict = true; break; }
+        if (conflict) continue;
+
+        auto& route = recombined.get_route(assigned);
+        route.assign(1, src);
+        for (NodeId c : cand.customers) { route.push_back(c); used[c] = true; }
+        route.push_back(sink);
+        placed_reward += cand.reward;
+        ++assigned;
+    }
+    for (int v = assigned; v < nv; ++v)
+        recombined.get_route(v) = {src, sink};
+
+    // 3. Rebuild bookkeeping, repair leftover customers, then minimise makespan.
+    std::vector<bool>                       visited;
+    std::vector<local_search::RouteContext> ctx;
+    rebuild_bookkeeping(ls, problem, recombined, visited, ctx);
+    recombined.total_reward = placed_reward;  // repair() increments from here
+    ls.repair(recombined, visited, ctx, ls_cfg);
+    for (int v = 0; v < nv; ++v)
+        ls.minimize_makespan(recombined, ctx, v);
+
+    return recombined;
+}
+
+// ---------------------------------------------------------------------------
 // Solve
 // ---------------------------------------------------------------------------
 
@@ -103,7 +191,6 @@ model::Solution ILSRouteRecombinationSolver::solve(
     ls_cfg.rcl_size = config.rcl_size;
 
     const int nv = problem.get_num_vehicles();
-    const int nn = static_cast<int>(problem.get_num_nodes());
 
     auto construct = [&](model::Solution&                         sol,
                          std::vector<bool>&                       vis,
@@ -161,53 +248,26 @@ model::Solution ILSRouteRecombinationSolver::solve(
             ++no_impr;
         }
 
-        // Route recombination when stagnating
+        // Route recombination when stagnating: rebuild a solution from the best
+        // customer-disjoint routes seen across the elite pool.
         if (no_impr >= config.restart_threshold && !elite_pool.empty()) {
-            // Pick a guiding solution from the pool
-            const auto& guide = elite_pool[rng.next_int(0, static_cast<int>(elite_pool.size()) - 1)];
+            model::Solution recombined = recombine_routes(problem, elite_pool, ls, ls_cfg);
 
-            // Collect customers in guide but not in current
-            std::vector<bool> in_current(nn, false);
-            for (int v = 0; v < nv; ++v)
-                for (NodeId n : current.get_route(v)) in_current[n] = true;
-
-            // Try inserting guide customers into current greedily
-            for (int v = 0; v < guide.get_num_vehicles(); ++v) {
-                const auto& gr = guide.get_route(v);
-                for (size_t i = 1; i + 1 < gr.size(); ++i) {
-                    NodeId c = gr[i];
-                    if (in_current[c]) continue;
-
-                    // Find best insertion across all vehicles
-                    double best_shift = local_search::BaseLSUtils::INF;
-                    int    best_veh   = -1, best_pos = -1;
-                    for (int tv = 0; tv < nv; ++tv) {
-                        const auto& tr = current.get_route(tv);
-                        for (int p = 1; p < static_cast<int>(tr.size()); ++p) {
-                            double shift = ls.check_insertion(current, cur_ctx, tv, c, p);
-                            if (shift < best_shift) { best_shift = shift; best_veh = tv; best_pos = p; }
-                        }
-                    }
-                    if (best_veh >= 0 && best_shift < local_search::BaseLSUtils::INF) {
-                        ls.apply_insertion_public(current, cur_ctx, cur_vis, best_veh, c, best_pos, best_shift);
-                        in_current[c] = true;
-                    }
-                }
-            }
-
-            // Accept recombined if better
-            if (current.total_reward > best.total_reward) {
-                best         = current;
-                best_vis     = cur_vis;
-                best_ctx     = cur_ctx;
-                shake_length = 1;
+            if (recombined.total_reward > best.total_reward) {
+                best = recombined;
+                rebuild_bookkeeping(ls, problem, best, best_vis, best_ctx);
                 add_to_pool(elite_pool, best, config.pool_size, config.similarity_threshold);
+                shake_length = 1;
+                if (config.verbose)
+                    std::cout << "[ILS+RR] recombination -> " << best.total_reward << '\n';
             } else {
-                current  = best;
-                cur_vis  = best_vis;
-                cur_ctx  = best_ctx;
                 ++shake_length;
             }
+
+            // Restart the walk from the incumbent best.
+            current = best;
+            cur_vis = best_vis;
+            cur_ctx = best_ctx;
             no_impr = 0;
         }
     }

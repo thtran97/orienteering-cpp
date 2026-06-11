@@ -105,9 +105,18 @@ CPLEX/CUDD/CryptoMiniSat goes behind an OFF-by-default CMake option.
       decision-diagram construction, full `pulse_algo` bounding) for scaling to
       larger instances.
 
-### Phase 2 — Route Recombination (flagship)
-Port `route_recombinator` (`combinator`, `state`) + `solver_with_rr`; upgrade
-`ils_route_recombination` to full fidelity.
+### Phase 2 — Route Recombination (flagship)  *(route-level operator added)*
+- [x] Added a true route-level recombination operator
+      `ILSRouteRecombinationSolver::recombine_routes` — a max-weight set-packing
+      over the elite pool's routes (greedily selects the highest-reward
+      customer-disjoint routes, assigns them to vehicles, repairs leftovers).
+      Replaces the previous customer-level path-relinking, matching the intent of
+      toptwLib's `route_recombinator` / `combinator`. Valid for TOP/TOPTW because
+      vehicles are independent, so a route stays feasible when reassigned.
+- [x] Added `tests/test_route_recombination.cpp` (combines disjoint routes,
+      never worse than the best pool member, empty-pool safety).
+- [ ] Full `solver_with_rr` fidelity (exact set-packing / column-generation
+      route selection over a larger pool) for stronger recombination.
 
 ### Phase 3 — Knowledge Base + conflict explanation (research core)
 Wire `xplainer` / `conflict_extractor` into the existing `sel_manager` PB KB;
