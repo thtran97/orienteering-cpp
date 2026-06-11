@@ -28,7 +28,7 @@ struct MCTSNode {
     std::unordered_map<NodeId, MCTSNode*> children; ///< action → child
 
     MCTSNode(NodeId state_, MCTSNode* parent_, std::vector<bool> visited_)
-        : state(state_), parent(parent_), visited(std::move(visited_)) {}
+        : state(state_), visited(std::move(visited_)), parent(parent_) {}
 
     ~MCTSNode() = default;
 

@@ -177,54 +177,58 @@ model::Solution ForwardDPSolver::solve(const model::Problem& problem,
 std::vector<Reward> BackwardDPSolver::compute_bounds(const model::Problem& problem) const
 {
     const int    nn   = static_cast<int>(problem.get_num_nodes());
+    const NodeId src  = problem.get_source_depot();
     const NodeId sink = problem.get_sink_depot();
 
-    // ub[i] = max reward collectable starting from node i and reaching sink.
-    // Relaxation that ignores visited-node constraints (so it is an upper bound).
+    // ub[i] = a valid UPPER bound on the reward collectable on a path that
+    // continues from node i to the sink (excluding i's own reward).
     //
-    // Two improvements over a naive single-pass:
-    //  1. Budget-awareness: arcs (i,j) whose minimum detour already exceeds
-    //     the budget are excluded, keeping the bound tight and preventing
-    //     it from including infeasible detours.
-    //  2. Tie-breaking by distance to sink: when TW closing times are equal
-    //     (e.g. in plain OP where all windows are [0,∞)), nodes closer to
-    //     the sink are processed first.  This ensures their ub values are
-    //     available when we compute ub for nodes farther from the sink,
-    //     avoiding drastic underestimates that would cause incorrect pruning.
+    // Relaxation: sum the rewards of every customer j that is individually
+    // still collectable after i, i.e.
+    //   (1) i -> j is time-window feasible at the earliest departure from i, and
+    //   (2) j -> sink is feasible within the sink's window and the time budget.
+    // Summing all such j over-counts (a real route cannot visit them all), so
+    // it is a sound upper bound. Using the earliest possible departure from i
+    // is the most optimistic assumption, keeping the bound valid for any real
+    // partial path that arrives at i later.
+    //
+    // Validity of the per-customer reachability test relies on the triangle
+    // inequality of travel times (true for Euclidean OP/OPTW): if j is
+    // reachable from i via an intermediate node it is also reachable directly,
+    // so no collectable customer is ever excluded (no underestimate). The
+    // previous path-recursion was invalid on the cyclic graph and produced
+    // underestimates, which made Pulse/BidirectionalDP prune optimal paths.
     std::vector<Reward> ub(nn, 0.0);
 
-    const Time budget = problem.get_budget();
+    const Time budget       = problem.get_budget();
+    const Time src_open      = problem.get_time_window(src).opening;
+    const Time sink_closing  = problem.get_time_window(sink).closing;
 
-    std::vector<int> order(nn);
-    std::iota(order.begin(), order.end(), 0);
-    std::sort(order.begin(), order.end(), [&](int a, int b) {
-        double ca = problem.get_time_window(a).closing;
-        double cb = problem.get_time_window(b).closing;
-        if (std::abs(ca - cb) > 1e-9) return ca > cb;   // larger closing first
-        // tie-break: closer to sink first (more "backward" in the route)
-        return problem.get_distance(a, sink) < problem.get_distance(b, sink);
-    });
-
-    for (int i : order) {
+    for (int i = 0; i < nn; ++i) {
         if (i == sink) { ub[i] = 0.0; continue; }
-        Reward best = 0.0;
-        Time dep_i = problem.get_time_window(i).opening
-                     + problem.get_service_time(i);
+
+        const Time dep_i = problem.get_time_window(i).opening
+                           + problem.get_service_time(i);
+        Reward sum = 0.0;
+
         for (int j = 0; j < nn; ++j) {
-            if (j == i) continue;
-            Time arr_j = dep_i + problem.get_travel_time(i, j, dep_i);
-            if (arr_j > problem.get_time_window(j).closing) continue;
-            // Budget check: dep_i + travel(i→j) + service(j) + travel(j→sink)
-            // must not exceed the total budget (using earliest possible departure
-            // from i as the most optimistic assumption).
-            Time dep_j = std::max(arr_j, problem.get_time_window(j).opening)
-                         + problem.get_service_time(j);
-            Time arr_sink = dep_j + problem.get_travel_time(j, sink, dep_j);
-            if (arr_sink > budget) continue;
-            Reward cand = problem.get_reward(j) + ub[j];
-            best = std::max(best, cand);
+            if (j == i || j == src || j == sink) continue;
+
+            // (1) i -> j reachable before j closes (earliest departure from i).
+            const Time arr_j = dep_i + problem.get_travel_time(i, j, dep_i);
+            const auto& tw_j = problem.get_time_window(j);
+            if (arr_j > tw_j.closing) continue;
+
+            // (2) j -> sink feasible (sink window + total time budget).
+            const Time dep_j = std::max(arr_j, tw_j.opening)
+                               + problem.get_service_time(j);
+            const Time arr_sink = dep_j + problem.get_travel_time(j, sink, dep_j);
+            if (arr_sink > sink_closing) continue;
+            if (arr_sink - src_open > budget) continue;
+
+            sum += problem.get_reward(j);
         }
-        ub[i] = best;
+        ub[i] = sum;
     }
     return ub;
 }

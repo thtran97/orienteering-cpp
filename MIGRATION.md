@@ -92,10 +92,18 @@ CPLEX/CUDD/CryptoMiniSat goes behind an OFF-by-default CMake option.
       `argument_parser`) + a solver registry/CLI so new solvers are instantly
       benchmarkable.
 
-### Phase 1 — Harden the exact / bounding layer
-Upgrade the reduced `dp_solvers` and `pulse_solver` to full fidelity from
-`toptwLib/main` (`bidirectional_DP`, `dd_construction`, `dssr`; full
-`pulse_algo`). Use `benchmark_exact` as the oracle.
+### Phase 1 — Harden the exact / bounding layer  *(correctness hardened)*
+- [x] Fixed an invalid backward bound — a path-recursion that *under*estimated
+      on the cyclic graph — which had made `PulseSolver` non-optimal and risked
+      incorrect pruning in `BidirectionalDP`. Replaced with a sound
+      sum-of-reachable-customers upper bound (valid via the triangle inequality).
+- [x] Added `tests/test_exact_optimality.cpp`: an independent brute-force oracle
+      proves `ForwardDP`, `BidirectionalDP` and `Pulse` return the true optimum
+      across 50 randomized OP/OPTW instances; backward bounds are verified to
+      dominate the optimum.
+- [ ] Further fidelity from `toptwLib/main` (decremental state-space relaxation,
+      decision-diagram construction, full `pulse_algo` bounding) for scaling to
+      larger instances.
 
 ### Phase 2 — Route Recombination (flagship)
 Port `route_recombinator` (`combinator`, `state`) + `solver_with_rr`; upgrade
