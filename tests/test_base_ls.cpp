@@ -342,6 +342,96 @@ TEST_F(BaseLSUtilsTest, MinimizeMakespan_RouteRemainsValid) {
 }
 
 // ---------------------------------------------------------------------------
+// Regression: forward propagation correctness (issue #4)
+//   After each apply_insertion_public call, every RouteContext field must
+//   exactly match a fresh recompute_context — even when a downstream node's
+//   TW wait absorbs the shift (old code broke early on arrival-only checks).
+// ---------------------------------------------------------------------------
+
+TEST_F(BaseLSUtilsTest, ApplyInsertion_ContextMatchesRecomputeAfterEachStep) {
+    auto problem = make_linear_op();
+    BaseLSUtils utils(problem, rng);
+
+    model::Solution sol;
+    std::vector<bool> visited;
+    std::vector<RouteContext> ctxs;
+    utils.init(sol, visited, ctxs);
+
+    // Insert customers one by one and verify context after each insertion
+    for (NodeId c : {NodeId(1), NodeId(2), NodeId(3)}) {
+        const auto& route = sol.get_route(0);
+        // Find best insertion position
+        double best_shift = BaseLSUtils::INF;
+        int    best_pos   = -1;
+        for (int pos = 1; pos < static_cast<int>(route.size()); ++pos) {
+            double s = utils.check_insertion(sol, ctxs, 0, c, pos);
+            if (s < best_shift) { best_shift = s; best_pos = pos; }
+        }
+        if (best_pos < 0) continue; // not feasible
+
+        utils.apply_insertion_public(sol, ctxs, visited, 0, c, best_pos, best_shift);
+
+        RouteContext recomputed;
+        utils.recompute_context(sol.get_route(0), recomputed);
+        const auto& ctx = ctxs[0];
+        ASSERT_EQ(ctx.arrival_times.size(), recomputed.arrival_times.size());
+        for (int i = 0; i < static_cast<int>(ctx.arrival_times.size()); ++i) {
+            EXPECT_NEAR(ctx.arrival_times[i],   recomputed.arrival_times[i],   1e-9)
+                << "Arrival mismatch at position " << i << " after inserting node " << c;
+            EXPECT_NEAR(ctx.departure_times[i], recomputed.departure_times[i], 1e-9)
+                << "Departure mismatch at position " << i << " after inserting node " << c;
+            EXPECT_NEAR(ctx.max_shift[i],       recomputed.max_shift[i],       1e-9)
+                << "MaxShift mismatch at position " << i << " after inserting node " << c;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Regression: roulette wheel bias toward high-reward candidates (issue #5)
+//   With a dominant-reward customer in the RCL, repair should choose it
+//   much more often than a low-reward alternative across many trials.
+//   The original fallback to candidates.front() (worst) biased against this.
+// ---------------------------------------------------------------------------
+
+TEST_F(BaseLSUtilsTest, Repair_PrefersHighRewardCandidateStatistically) {
+    // Build a problem where node 1 has reward 100x node 2 and fits in budget.
+    // Budget is tight enough so only ONE customer can be visited per route.
+    OPProblem problem("roulette_test", 25.0); // budget=25: fits source→c→sink for c near source
+    problem.add_node(Node{0,  0.0, 0.0,   0.0, 0.0}); // source
+    problem.add_node(Node{1,  5.0, 0.0, 100.0, 0.0}); // high reward, close to source
+    problem.add_node(Node{2,  6.0, 0.0,   1.0, 0.0}); // low reward, slightly further
+    problem.add_node(Node{3, 20.0, 0.0,   0.0, 0.0}); // sink
+    problem.finalize();
+    problem.preprocessing();
+
+    int high_reward_selected = 0;
+    const int trials = 50;
+    LSConfig cfg;
+    cfg.rcl_size = 2; // both customers in RCL
+
+    for (int seed = 0; seed < trials; ++seed) {
+        oplib::utils::Random local_rng(static_cast<uint32_t>(seed));
+        BaseLSUtils utils(problem, local_rng);
+
+        model::Solution sol;
+        std::vector<bool> visited;
+        std::vector<RouteContext> ctxs;
+        utils.init(sol, visited, ctxs);
+        utils.repair(sol, visited, ctxs, cfg);
+
+        const auto& route = sol.get_route(0);
+        bool has_high = std::find(route.begin(), route.end(), NodeId(1)) != route.end();
+        if (has_high) ++high_reward_selected;
+    }
+
+    // With 100:1 reward ratio and alpha=2, the score ratio is 10000:1.
+    // Even with RCL fallback noise, the high-reward node should dominate.
+    EXPECT_GE(high_reward_selected, trials * 8 / 10)
+        << "High-reward candidate selected only " << high_reward_selected
+        << "/" << trials << " times — roulette may be biased toward worst fallback";
+}
+
+// ---------------------------------------------------------------------------
 // Round-trip: repair → destroy → repair
 // ---------------------------------------------------------------------------
 

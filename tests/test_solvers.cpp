@@ -339,6 +339,37 @@ TEST_F(ILSRRTest, SolutionStructureIsValid) {
     EXPECT_EQ(uniq.size(), route.size()); // no duplicates
 }
 
+// Regression: pool diversity check was O(V·n²) and had a vehicle-count
+// mismatch bug; this multi-vehicle test exercises the cross-vehicle customer
+// lookup path in add_to_pool.
+TEST_F(ILSRRTest, MultiVehicle_PoolDiversityDoesNotCrash) {
+    auto problem = make_top6();
+    solver::metaheuristic::ILSRouteRecombinationSolverConfig mcfg = cfg;
+    mcfg.max_iterations    = 30;
+    mcfg.pool_size         = 3;
+    mcfg.similarity_threshold = 0.8; // low enough to admit diverse solutions
+    solver::metaheuristic::ILSRouteRecombinationSolver solver;
+    auto sol = solver.solve(problem, mcfg);
+    // Result must have correct route structure
+    EXPECT_EQ(sol.get_num_vehicles(), 2);
+    for (int v = 0; v < 2; ++v) {
+        const auto& r = sol.get_route(v);
+        EXPECT_EQ(r.front(), problem.get_source_depot());
+        EXPECT_EQ(r.back(),  problem.get_sink_depot());
+        std::set<NodeId> uniq(r.begin(), r.end());
+        EXPECT_EQ(uniq.size(), r.size());
+    }
+    // No customer visited by more than one vehicle
+    std::set<NodeId> all_visited;
+    for (int v = 0; v < 2; ++v) {
+        const auto& r = sol.get_route(v);
+        for (size_t i = 1; i + 1 < r.size(); ++i) {
+            EXPECT_TRUE(all_visited.insert(r[i]).second)
+                << "Node " << r[i] << " visited by multiple vehicles";
+        }
+    }
+}
+
 // ============================================================================
 // Phase 7 — MCTS
 // ============================================================================

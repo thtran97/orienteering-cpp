@@ -53,34 +53,40 @@ model::Solution GraspVnsSolver::solve(const model::Problem&       problem,
             ls.minimize_makespan(current, ctx, v);
 
         // ---- 3. VNS ----
+        // All position attempts within one shake_len level start from the same
+        // state, so we save once per shake_len rather than once per (v, pos).
         for (int shake_len = 1; shake_len <= config.max_shake_length; ) {
             bool any_improved = false;
+
+            model::Solution                         saved_sol = current;
+            std::vector<bool>                       saved_vis = visited;
+            std::vector<local_search::RouteContext> saved_ctx = ctx;
+
             for (int v = 0; v < nv && !any_improved; ++v) {
-                const auto& route = current.get_route(v);
-                const int   rsz   = static_cast<int>(route.size());
+                const int rsz = static_cast<int>(saved_sol.get_route(v).size());
                 for (int pos = 1; pos < rsz - 1 && !any_improved; ++pos) {
-                    // Save state
-                    model::Solution                         saved_sol  = current;
-                    std::vector<bool>                       saved_vis  = visited;
-                    std::vector<local_search::RouteContext> saved_ctx  = ctx;
-                    double reward_before = current.total_reward;
+                    // Restore checkpoint before each attempt
+                    current = saved_sol;
+                    visited = saved_vis;
+                    ctx     = saved_ctx;
 
                     ls.shake(current, visited, ctx, v, pos, shake_len);
                     ls.repair(current, visited, ctx, ls_cfg);
 
-                    if (current.total_reward > reward_before) {
+                    if (current.total_reward > saved_sol.total_reward) {
                         ls.minimize_makespan(current, ctx, v);
-                        shake_len    = 1; // restart VNS from shortest neighbourhood
+                        shake_len    = 1;
                         any_improved = true;
-                    } else {
-                        // Revert
-                        current = saved_sol;
-                        visited = saved_vis;
-                        ctx     = saved_ctx;
                     }
                 }
             }
-            if (!any_improved) ++shake_len;
+
+            if (!any_improved) {
+                current = saved_sol; // last attempt left current in a shaken state
+                visited = saved_vis;
+                ctx     = saved_ctx;
+                ++shake_len;
+            }
         }
 
         // ---- 4. Update global best ----

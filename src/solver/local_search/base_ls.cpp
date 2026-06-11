@@ -187,12 +187,13 @@ void BaseLSUtils::apply_insertion(model::Solution& solution,
     ctx.departure_times.insert(ctx.departure_times.begin() + position, dep_c);
     ctx.max_shift.insert(ctx.max_shift.begin() + position, 0.0); // filled in backward pass
 
-    // Forward pass: propagate shift through successors until absorbed
+    // Forward pass: propagate shift through successors.
+    // Break only when the departure time at node i is unchanged — that guarantees
+    // all downstream nodes are unaffected. Checking arrival is wrong: a node that
+    // absorbs the shift via its time-window wait leaves departure unchanged, but a
+    // node with no wait and a decreased arrival also decreases its departure, which
+    // must still propagate to its successors.
     const int rsz = static_cast<int>(route.size());
-    Time remaining_shift = dep_c - (ctx.departure_times[position - 1]
-                                    + problem_.get_travel_time(prev, route[position + 1],
-                                                               ctx.departure_times[position - 1]));
-    // Recompute successors fully for correctness
     for (int i = position + 1; i < rsz; ++i) {
         NodeId prv = route[i - 1];
         NodeId cur = route[i];
@@ -201,11 +202,10 @@ void BaseLSUtils::apply_insertion(model::Solution& solution,
         Time arr       = dep_prv + travel;
         const auto& tw = problem_.get_time_window(cur);
         Time start_svc = std::max(arr, tw.opening);
-        Time old_arr   = ctx.arrival_times[i];
+        Time old_dep   = ctx.departure_times[i];
         ctx.arrival_times[i]   = arr;
         ctx.departure_times[i] = start_svc + problem_.get_service_time(cur);
-        remaining_shift = arr - old_arr;
-        if (remaining_shift <= 0.0) break; // shift fully absorbed
+        if (ctx.departure_times[i] == old_dep) break; // downstream unaffected
     }
 
     // Backward pass: recompute max_shift
@@ -345,13 +345,16 @@ void BaseLSUtils::repair(model::Solution& solution,
             rcl.pop();
         }
 
-        // Weighted roulette selection
+        // Weighted roulette selection.
+        // candidates is ordered worst→best (min-heap pop order), so candidates.back()
+        // is the highest-score candidate. Default to it so floating-point shortfall in
+        // the accumulated sum still picks the best option, not the worst.
         double threshold = rng_.next_double(0.0, 1.0);
         double accum = 0.0;
         const CandidateEntry* chosen = &candidates.back();
         for (const auto& cand : candidates) {
             accum += cand.first / sum_scores;
-            if (accum > threshold) {
+            if (accum >= threshold) {
                 chosen = &cand;
                 break;
             }

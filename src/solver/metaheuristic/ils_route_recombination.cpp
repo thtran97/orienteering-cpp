@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <unordered_set>
 
 #include "solver/metaheuristic/ils_route_recombination.h"
 #include "core/random.h"
@@ -38,21 +39,23 @@ void ILSRouteRecombinationSolver::add_to_pool(std::vector<model::Solution>& pool
                                                int                            pool_size,
                                                double                         similarity_threshold) const
 {
-    const int nn = sol.get_num_vehicles() > 0
-                   ? static_cast<int>(sol.get_route(0).size()) + 10 // rough bound
-                   : 0;
-    (void)nn; // num_nodes not easily available here; diversity check via route size
-
-    // Check similarity against existing pool members
+    // Check similarity against existing pool members.
+    // Build a flat set of each member's customers (all vehicles combined) for O(1)
+    // lookup, reducing the per-member check from O(V·n²) to O(V·n).
     for (const auto& member : pool) {
-        // Simple diversity: count shared customers across all vehicles
+        std::unordered_set<NodeId> member_customers;
+        for (int v = 0; v < member.get_num_vehicles(); ++v) {
+            const auto& rb = member.get_route(v);
+            for (size_t i = 1; i + 1 < rb.size(); ++i)
+                member_customers.insert(rb[i]);
+        }
+
         int shared = 0, total_cust = 0;
         for (int v = 0; v < sol.get_num_vehicles(); ++v) {
             const auto& ra = sol.get_route(v);
-            const auto& rb = (v < member.get_num_vehicles()) ? member.get_route(v) : ra;
             for (size_t i = 1; i + 1 < ra.size(); ++i) {
                 ++total_cust;
-                if (std::find(rb.begin(), rb.end(), ra[i]) != rb.end()) ++shared;
+                if (member_customers.count(ra[i])) ++shared;
             }
         }
         double sim = (total_cust == 0) ? 1.0 : static_cast<double>(shared) / total_cust;
