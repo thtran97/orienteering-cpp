@@ -42,6 +42,7 @@
 #include "solver/metaheuristic/grasp_vns.h"
 #include "solver/metaheuristic/ils09.h"
 #include "solver/metaheuristic/ils_route_recombination.h"
+#include "solver/metaheuristic/sails.h"
 #include "solver/policy_learning/mcts_solver.h"
 #include "solver/dynamic_programming/dp_solvers.h"
 #include "solver/pulse/pulse_solver.h"
@@ -182,6 +183,7 @@ void run_common_solvers(const model::Problem& p) {
     run_ok<GraspVnsSolver>(p, base_cfg<GraspVnsSolverConfig>(5), true, "GraspVns");
     run_ok<ILS09Solver>(p, base_cfg<ILS09SolverConfig>(20), true, "ILS09");
     run_ok<ILSRouteRecombinationSolver>(p, base_cfg<ILSRouteRecombinationSolverConfig>(20), true, "ILS-RR");
+    run_ok<SAILSSolver>(p, base_cfg<SAILSSolverConfig>(20), true, "SAILS");
     // MCTS is stochastic; assert validity + non-negativity (not strict positivity).
     run_ok<MCTSSolver>(p, base_cfg<MCTSSolverConfig>(50), false, "MCTS");
 }
@@ -269,4 +271,18 @@ TEST(AllVariants, TTDP) {
     TTDPProblem p("ttdp", /*num_days=*/2, 200.0);
     add_nodes(p, /*with_tw=*/true);
     run_common_solvers(p);
+}
+
+// ============================================================================
+// SAILS: with a fixed seed the run is deterministic, so a longer run explores a
+// superset of the shorter one and its best can never be worse.
+// ============================================================================
+TEST(SAILS, MoreIterationsNotWorse) {
+    OPProblem p("sails_op", 500.0);
+    add_nodes(p, /*with_tw=*/false);
+    solver::metaheuristic::SAILSSolver sails;
+    Reward few  = sails.solve(p, base_cfg<solver::metaheuristic::SAILSSolverConfig>(5)).total_reward;
+    Reward many = sails.solve(p, base_cfg<solver::metaheuristic::SAILSSolverConfig>(80)).total_reward;
+    EXPECT_GE(many, few - 1e-9);
+    EXPECT_GT(many, 0.0);
 }

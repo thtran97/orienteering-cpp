@@ -130,8 +130,14 @@ CPLEX/CUDD/CryptoMiniSat goes behind an OFF-by-default CMake option.
       then adapt `solver_with_xp` to drive construction from the KB's decision
       heuristic.
 
-### Phase 4 — Remaining solvers
-`mcls`, `SAILS`, `LNS_with_pulse`, `ILS09_with_xpdp`.
+### Phase 4 — Remaining solvers  *(SAILS added)*
+- [x] Implemented `SAILSSolver` (Simulated-Annealing Iterated Local Search) on the
+      shared BaseLSUtils primitives — it existed only as a stub in toptwLib.
+      Metropolis acceptance with geometric cooling + reheating. Exercised across
+      all 9 variants and with a determinism property test (more iterations never
+      worse at a fixed seed).
+- [ ] `mcls` (Monte-Carlo LS), `LNS_with_pulse` (LNS whose repair uses the exact
+      pulse bound), and `ILS09_with_xpdp` (depends on the Phase 3 xplainer port).
 
 ### Phase 5 — (Optional, CMake-gated) external-backend KB
 Reintroduce `kb_ls_cpp`'s SAT/BDD/CP backends as an experimental module behind
