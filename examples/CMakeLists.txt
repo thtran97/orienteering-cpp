@@ -22,3 +22,6 @@ target_link_libraries(benchmark_all orienteeringLib)
 
 add_executable(benchmark_exact benchmark_exact.cpp)
 target_link_libraries(benchmark_exact orienteeringLib)
+
+add_executable(benchmark_toptw_vehicles benchmark_toptw_vehicles.cpp)
+target_link_libraries(benchmark_toptw_vehicles orienteeringLib)
