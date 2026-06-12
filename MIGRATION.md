@@ -139,6 +139,13 @@ CPLEX/CUDD/CryptoMiniSat goes behind an OFF-by-default CMake option.
 - [ ] `mcls` (Monte-Carlo LS), `LNS_with_pulse` (LNS whose repair uses the exact
       pulse bound), and `ILS09_with_xpdp` (depends on the Phase 3 xplainer port).
 
-### Phase 5 — (Optional, CMake-gated) external-backend KB
-Reintroduce `kb_ls_cpp`'s SAT/BDD/CP backends as an experimental module behind
-an OFF-by-default option, for research comparison vs. the dependency-free PB KB.
+### Phase 5 — (Optional, CMake-gated) external-backend KB  *(gate + scaffold added)*
+- [x] Added the `ENABLE_EXTERNAL_KB` CMake option (OFF by default) and the gated
+      `experimental/external_kb/` module: a design doc mapping kb_ls_cpp's
+      SAT (CryptoMiniSat) / BDD (CUDD) / CP (CPLEX) backends onto a common
+      selection-KB contract, plus a dependency-checking `CMakeLists.txt` that
+      fails fast with a clear message when enabled without the libraries. The
+      default build is entirely unaffected (warning-free, 106 pass / 1 skip).
+- [ ] Port the backend implementations from kb_ls_cpp (`kb_factory`, `wobdd`,
+      `cpo_model`, `xplainer`) behind the gate, and add a `KnowledgeBaseBackend`
+      interface that both the PB KB and the external backends implement.

@@ -35,5 +35,14 @@ if(PACKAGE_TESTS)
     add_subdirectory(tests)
 endif()
 
+# Optional experimental module: external-solver-backed knowledge base
+# (kb_ls_cpp heritage -- SAT/BDD/CP backends). OFF by default so the core library
+# stays dependency-free. See experimental/external_kb/README.md.
+option(ENABLE_EXTERNAL_KB "Build the experimental external-solver KB backends (needs CryptoMiniSat/CUDD/CPLEX)" OFF)
+message("[INFO] External KB backends (ENABLE_EXTERNAL_KB): ${ENABLE_EXTERNAL_KB}")
+if(ENABLE_EXTERNAL_KB)
+    add_subdirectory(experimental/external_kb)
+endif()
+
 message("[INFO] Configuring project ${PROJECT_NAME} successful!")
 message("----------------------------------------")
