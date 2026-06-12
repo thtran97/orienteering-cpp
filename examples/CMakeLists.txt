@@ -25,3 +25,9 @@ target_link_libraries(benchmark_exact orienteeringLib)
 
 add_executable(benchmark_toptw_vehicles benchmark_toptw_vehicles.cpp)
 target_link_libraries(benchmark_toptw_vehicles orienteeringLib)
+
+add_executable(debug_greedy_toptw debug_greedy_toptw.cpp)
+target_link_libraries(debug_greedy_toptw orienteeringLib)
+
+add_executable(test_toptw_quick test_toptw_quick.cpp)
+target_link_libraries(test_toptw_quick orienteeringLib)

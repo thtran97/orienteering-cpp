@@ -252,14 +252,9 @@ static std::unique_ptr<TOPTWProblem> create_toptw_with_vehicles(
         return nullptr;
     }
 
-    std::string filename = filepath.substr(filepath.find_last_of("/\\") + 1);
-    double time_scale = 100.0;
-    if (filename.rfind("r", 0) == 0 || filename.rfind("c", 0) == 0) {
-        time_scale = 10.0;
-    }
-
     std::string line;
     double tmax_raw = 0.0;
+    double time_scale = 1.0;  // No scaling - data is already in correct units
 
     // Line 1: num_vehicles, ???, budget, ???
     if (std::getline(file, line)) {
@@ -274,19 +269,41 @@ static std::unique_ptr<TOPTWProblem> create_toptw_with_vehicles(
 
     auto problem = std::make_unique<TOPTWProblem>(filepath, num_vehicles,
                                                    tmax_raw * time_scale);
+    problem->set_scaling(ScalingMode::SCALED_INTEGER, time_scale);
 
     std::vector<Node> parsed_nodes;
     while (std::getline(file, line)) {
         if (line.empty()) continue;
         std::stringstream ss(line);
         Node node;
-        if (!(ss >> node.id >> node.x >> node.y >> node.service_time
-              >> node.reward >> node.tw.opening >> node.tw.closing)) {
+        double dummy1, dummy2, dummy3;
+        double first_tw;
+
+        // Try to read all possible values
+        if (!(ss >> node.id >> node.x >> node.y >> node.service_time >> node.reward
+              >> dummy1 >> dummy2 >> dummy3)) {
             continue;
         }
-        node.service_time *= time_scale;
-        node.tw.opening *= time_scale;
-        node.tw.closing *= time_scale;
+
+        // Now try to read time windows - could be 1 or 2 values
+        if (!(ss >> first_tw)) {
+            // No time windows at all (shouldn't happen)
+            node.tw.opening = 0.0;
+            node.tw.closing = 1e18;
+        } else {
+            // We read one value. Check if there's another
+            double second_tw;
+            if (ss >> second_tw) {
+                // Two values: opening and closing
+                node.tw.opening = first_tw;
+                node.tw.closing = second_tw;
+            } else {
+                // One value: treat as closing time, opening defaults to 0
+                node.tw.opening = 0.0;
+                node.tw.closing = first_tw;
+            }
+        }
+
         parsed_nodes.push_back(node);
     }
 
