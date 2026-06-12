@@ -33,10 +33,10 @@ model::Solution GreedySolver::solve(const model::Problem& problem, const GreedyS
     visited[problem.get_source_depot()] = true;
     visited[problem.get_sink_depot()] = true;
 
-    // Initialize route contexts for incremental update 
+    // Initialize route contexts for incremental update
     // (arrival/departure/max_shift/budget)
     std::vector<RouteContext> route_contexts(num_vehicles);
-    
+
     // Base route time is the direct source→sink distance; this seeds the budget
     // check so that cumulative_time always represents the TOTAL trip time, not
     // just the extra detour added on top of the direct leg.
@@ -50,7 +50,7 @@ model::Solution GreedySolver::solve(const model::Problem& problem, const GreedyS
         route_contexts[v].max_shift = {std::numeric_limits<Time>::max(), std::numeric_limits<Time>::max()};
         route_contexts[v].cumulative_time = base_trip_time;
     }
-    
+
     // clear cache before starting construction
     infeasibility_cache.clear();
 
@@ -70,7 +70,7 @@ model::Solution GreedySolver::solve(const model::Problem& problem, const GreedyS
         solution.total_reward += problem.get_reward(best_move.customer);
         solution.total_travel_time += best_move.time_shift;
     }
-    
+
     return solution;
 }
 

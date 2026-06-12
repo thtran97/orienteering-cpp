@@ -14,10 +14,8 @@ std::unique_ptr<model::Problem> TOPTWParser::read(const std::string& filepath) {
     }
 
     std::string filename = filepath.substr(filepath.find_last_of("/\\") + 1);
-    double time_scale = 100.0; // Default Cordeau
-    if (filename.rfind("r", 0) == 0 || filename.rfind("c", 0) == 0) {
-        time_scale = 10.0; // Solomon
-    }
+    double time_scale = 1.0; // No scaling - data is already in correct units
+    // (Removed: time_scale = 100.0 for Cordeau, 10.0 for Solomon)
 
     std::string line;
     int num_vehicles = 0;
@@ -27,14 +25,16 @@ std::unique_ptr<model::Problem> TOPTWParser::read(const std::string& filepath) {
     if (std::getline(file, line)) {
         std::stringstream ss(line);
         ss >> num_vehicles;
-        double dummy;
-        ss >> dummy;
-        ss >> tmax_raw;
+        double dummy1;
+        ss >> dummy1;
+        ss >> tmax_raw;  // 3rd column is the budget
+        double dummy3;
+        ss >> dummy3;
     }
 
     // Skip line 2
-    if (std::getline(file, line)) {}  
-    
+    if (std::getline(file, line)) {}
+
     // Line 3 onwards: node data starts here
 
     // Use budget as tmax for TW variants
@@ -42,19 +42,19 @@ std::unique_ptr<model::Problem> TOPTWParser::read(const std::string& filepath) {
     problem->set_scaling(ScalingMode::SCALED_INTEGER, time_scale);
 
     // read remaining lines as nodes
-    // format: id;reward;service_time;opening;closing
+    // format: id x y service_time reward [3 extra fields] tw_opening tw_closing
     std::vector<model::Node> parsed_nodes;
     while (std::getline(file, line)) {
         if (line.empty()) continue;
         std::stringstream ss(line);
         model::Node node;
-        if (!(ss >> node.id >> node.x >> node.y >> node.service_time >> node.reward >> node.tw.opening >> node.tw.closing)) {
+        double dummy1, dummy2, dummy3;  // Skip 3 extra fields (may be floats)
+        if (!(ss >> node.id >> node.x >> node.y >> node.service_time >> node.reward
+              >> dummy1 >> dummy2 >> dummy3 >> node.tw.opening >> node.tw.closing)) {
             continue;
         }
-        // Scale values during parse to match legacy GenericOrienteeringProblem::parse_toptw_instance
-        node.service_time *= time_scale;
-        node.tw.opening *= time_scale;
-        node.tw.closing *= time_scale;
+        // DO NOT scale service times or time windows - they are already in the correct scale
+        // Only distances (computed in finalize()) are scaled
         parsed_nodes.push_back(node);
     }
 
