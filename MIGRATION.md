@@ -118,9 +118,17 @@ CPLEX/CUDD/CryptoMiniSat goes behind an OFF-by-default CMake option.
 - [ ] Full `solver_with_rr` fidelity (exact set-packing / column-generation
       route selection over a larger pool) for stronger recombination.
 
-### Phase 3 — Knowledge Base + conflict explanation (research core)
-Wire `xplainer` / `conflict_extractor` into the existing `sel_manager` PB KB;
-adapt `solver_with_xp` / `smt_based_solver` logic, dependency-free.
+### Phase 3 — Knowledge Base + conflict explanation (research core)  *(KB verified)*
+- [x] Verified the dependency-free pseudo-Boolean `SelectionConstraintManager`
+      (successor of kb_ls_cpp's KB), which previously had **zero** coverage and no
+      solver using it. Added `tests/test_knowledge_base.cpp`: conflict /
+      disjunctive / knapsack propagation, objective lower-bound infeasibility
+      detection, unit-propagation of complements, backtracking via `unassign`,
+      and a KB-guided greedy selection loop.
+- [ ] Port `xplainer` / `conflict_extractor` to generate no-goods from infeasible
+      local-search moves and feed them (as conflict constraints) into this KB;
+      then adapt `solver_with_xp` to drive construction from the KB's decision
+      heuristic.
 
 ### Phase 4 — Remaining solvers
 `mcls`, `SAILS`, `LNS_with_pulse`, `ILS09_with_xpdp`.
