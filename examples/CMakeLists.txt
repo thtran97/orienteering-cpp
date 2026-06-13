@@ -34,3 +34,6 @@ target_link_libraries(test_toptw_quick orienteeringLib)
 
 add_executable(test_rand_greedy_5s test_rand_greedy_5s.cpp)
 target_link_libraries(test_rand_greedy_5s orienteeringLib)
+
+add_executable(test_metaheuristics_5s test_metaheuristics_5s.cpp)
+target_link_libraries(test_metaheuristics_5s orienteeringLib)
