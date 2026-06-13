@@ -97,7 +97,15 @@ static std::string verify_feasible(const Problem& problem, const Solution& sol) 
     return "";
 }
 
-int main() {
+int main(int argc, char** argv) {
+    // Optional args: argv[1]=time_limit_seconds (default 5), argv[2]=max_iters
+    // (default 0 => use each solver's built-in DEFAULT_MAX_ITERATIONS). Pass a
+    // large max_iters so the wall-clock limit is the binding constraint.
+    double time_limit = (argc > 1) ? std::stod(argv[1]) : 5.0;
+    int    max_iters  = (argc > 2) ? std::stoi(argv[2]) : 0;
+    // Optional argv[3]: comma-free single instance filter (e.g. "c101"); default both.
+    std::string only_inst = (argc > 3) ? argv[3] : "";
+
     std::vector<std::pair<std::string, Factory>> solvers = {
         {"rand_greedy", []{ return std::make_unique<constructive::RandomizedGreedySolver>(); }},
         {"grasp_vns",   []{ return std::make_unique<metaheuristic::GraspVnsSolver>(); }},
@@ -107,8 +115,10 @@ int main() {
         {"sails",       []{ return std::make_unique<metaheuristic::SAILSSolver>(); }},
     };
     std::vector<std::string> instances = {"pr01", "c101"};
+    if (!only_inst.empty()) instances = {only_inst};
 
-    std::cout << "=== Metaheuristics (5s limit) ===\n\n";
+    std::cout << "=== Metaheuristics (" << time_limit << "s limit, max_iters="
+              << (max_iters > 0 ? std::to_string(max_iters) : "default") << ") ===\n\n";
     std::cout << std::left
               << std::setw(12) << "Instance"
               << std::setw(14) << "Solver"
@@ -128,7 +138,8 @@ int main() {
 
                 SolverConfig config;
                 config.seed = 42;
-                config.max_cpu_time = 5.0;
+                config.max_cpu_time = time_limit;
+                if (max_iters > 0) config.max_iterations = max_iters;
 
                 auto solver = factory();
                 auto t0 = std::chrono::high_resolution_clock::now();
