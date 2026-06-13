@@ -31,3 +31,6 @@ target_link_libraries(debug_greedy_toptw orienteeringLib)
 
 add_executable(test_toptw_quick test_toptw_quick.cpp)
 target_link_libraries(test_toptw_quick orienteeringLib)
+
+add_executable(test_rand_greedy_5s test_rand_greedy_5s.cpp)
+target_link_libraries(test_rand_greedy_5s orienteeringLib)
