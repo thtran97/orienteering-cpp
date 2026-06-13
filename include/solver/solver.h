@@ -14,7 +14,12 @@ namespace oplib::solver {
  */
 struct SolverConfig {
     int seed = oplib::constants::DEFAULT_SEED;
+    // Wall-clock budget in seconds. A run stops at whichever limit is hit first.
     double max_cpu_time = oplib::constants::DEFAULT_TIMELIMIT_SECONDS;
+    // Iteration budget. A value <= 0 means "no iteration cap": the run is then
+    // bound purely by max_cpu_time. This lets callers make the timeout the sole
+    // limit (lift the iteration cap) by setting max_iterations = 0, while
+    // callers that pass a positive value keep the usual min(iterations, time).
     int max_iterations = oplib::constants::DEFAULT_MAX_ITERATIONS;
     bool verbose = false;
 };

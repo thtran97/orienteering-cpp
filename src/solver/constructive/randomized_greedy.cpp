@@ -33,7 +33,7 @@ model::Solution RandomizedGreedySolver::solve(const model::Problem&             
 
     auto t_start = std::chrono::high_resolution_clock::now();
 
-    for (int iter = 0; iter < config.max_iterations; ++iter) {
+    for (int iter = 0; config.max_iterations <= 0 || iter < config.max_iterations; ++iter) {
         // Wall-clock timeout
         auto elapsed = std::chrono::duration<double>(
             std::chrono::high_resolution_clock::now() - t_start).count();

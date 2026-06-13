@@ -60,10 +60,13 @@ model::Solution SAILSSolver::solve(const model::Problem&    problem,
     const auto t_start = Clock::now();
     auto elapsed = [&] { return std::chrono::duration<double>(Clock::now() - t_start).count(); };
 
+    // max_iterations <= 0 means "no iteration cap": bound purely by max_cpu_time.
     int iter = 0;
-    while (iter < config.max_iterations && elapsed() < config.max_cpu_time) {
+    auto iter_ok = [&] { return config.max_iterations <= 0 || iter < config.max_iterations; };
+
+    while (iter_ok() && elapsed() < config.max_cpu_time) {
         for (int inner = 0;
-             inner < config.inner_loop && iter < config.max_iterations && elapsed() < config.max_cpu_time;
+             inner < config.inner_loop && iter_ok() && elapsed() < config.max_cpu_time;
              ++inner, ++iter)
         {
             // Save the incumbent so a rejected move can be undone.
