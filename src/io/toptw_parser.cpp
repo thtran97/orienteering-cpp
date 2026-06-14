@@ -6,6 +6,23 @@
 
 namespace oplib::io {
 
+// Cordeau/Solomon TOPTW instances use the PVRPTW file format:
+//
+//   Line 1: K ? n Q
+//     K = number of vehicles (col 0)
+//     ? = other planning parameter (unused for TOPTW)
+//     n = number of customers
+//     Q = capacity (unused for orienteering)
+//
+//   Line 2: planning horizon parameters (skipped)
+//
+//   Node lines: id x y service_time reward freq num_combos [combo_1 ... combo_{num_combos}] tw_open tw_close
+//     freq, num_combos, and the combo codes are PVRPTW scheduling fields; for
+//     TOPTW (single-period) only tw_open and tw_close matter.
+//
+//   Budget: taken from the depot's (node 0) tw_close, consistent with how
+//   OPGraph::build_graph() derives tmax = source_tw.closing.
+
 std::unique_ptr<model::Problem> TOPTWParser::read(const std::string& filepath) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
@@ -13,84 +30,60 @@ std::unique_ptr<model::Problem> TOPTWParser::read(const std::string& filepath) {
         return nullptr;
     }
 
-    std::string filename = filepath.substr(filepath.find_last_of("/\\") + 1);
-    double time_scale = 1.0; // No scaling - data is already in correct units
-    // (Removed: time_scale = 100.0 for Cordeau, 10.0 for Solomon)
+    // time_scale = 1.0: coordinates, service times, and time windows are all in
+    // consistent units; distances are floored to integer travel times.
+    const double time_scale = 1.0;
 
     std::string line;
     int num_vehicles = 0;
-    double tmax_raw = 0.0;
 
-    // Line 1: num_vehicles, ???, budget, ???
+    // Line 1: K ? n Q — only the first column (K) is used.
     if (std::getline(file, line)) {
         std::stringstream ss(line);
         ss >> num_vehicles;
-        double dummy1;
-        ss >> dummy1;
-        ss >> tmax_raw;  // 3rd column is the budget
-        double dummy3;
-        ss >> dummy3;
     }
 
-    // Skip line 2
+    // Line 2: planning parameters — not used for single-period TOPTW.
     if (std::getline(file, line)) {}
 
-    // Line 3 onwards: node data starts here
-
-    // Use budget as tmax for TW variants
-    auto problem = std::make_unique<model::variants::TOPTWProblem>(filepath, num_vehicles, tmax_raw * time_scale);
-    problem->set_scaling(ScalingMode::SCALED_INTEGER, time_scale);
-
-    // read remaining lines as nodes
-    // Format has inconsistency: depot has 9 columns, customers have 10
-    // Depot: id x y service_time reward [3 fields] tw_closing (no tw_opening)
-    // Customers: id x y service_time reward [3 fields] tw_opening tw_closing
+    // Read all node lines.
+    // Format: id x y service_time reward freq num_combos [combo_codes * num_combos] tw_open tw_close
     std::vector<model::Node> parsed_nodes;
     while (std::getline(file, line)) {
         if (line.empty()) continue;
         std::stringstream ss(line);
         model::Node node;
-        double dummy1, dummy2, dummy3;  // Skip 3 extra fields (may be floats)
-        double first_tw;  // Could be tw_opening or just a single TW value
-
-        // Try to read all possible values
+        int freq, num_combos;
         if (!(ss >> node.id >> node.x >> node.y >> node.service_time >> node.reward
-              >> dummy1 >> dummy2 >> dummy3)) {
+                 >> freq >> num_combos)) {
             continue;
         }
-
-        // Now try to read time windows - could be 1 or 2 values
-        if (!(ss >> first_tw)) {
-            // No time windows at all (shouldn't happen)
-            node.tw.opening = 0.0;
-            node.tw.closing = 1e18;
-        } else {
-            // We read one value. Check if there's another
-            double second_tw;
-            if (ss >> second_tw) {
-                // Two values: opening and closing
-                node.tw.opening = first_tw;
-                node.tw.closing = second_tw;
-            } else {
-                // One value: treat as closing time, opening defaults to 0
-                node.tw.opening = 0.0;
-                node.tw.closing = first_tw;
-            }
+        // Skip the visit-combination codes (PVRPTW scheduling, not used for TOPTW).
+        for (int k = 0; k < num_combos; ++k) {
+            double combo;
+            if (!(ss >> combo)) break;
         }
-
-        // DO NOT scale service times or time windows - they are already in the correct scale
-        // Only distances (computed in finalize()) are scaled
+        if (!(ss >> node.tw.opening >> node.tw.closing)) {
+            continue;
+        }
         parsed_nodes.push_back(node);
     }
 
     if (parsed_nodes.empty()) return nullptr;
 
-    // Add nodes in order
+    // Budget = depot's closing time window, matching OPGraph::build_graph() which
+    // also sets tmax = source_tw.closing.
+    double tmax = parsed_nodes[0].tw.closing;
+
+    auto problem = std::make_unique<model::variants::TOPTWProblem>(filepath, num_vehicles, tmax);
+    problem->set_scaling(ScalingMode::SCALED_INTEGER, time_scale);
+
     for (const auto& node : parsed_nodes) {
         problem->add_node(node);
     }
 
-    // Duplicate depot as virtual end depot (Legacy convention)
+    // Duplicate depot as virtual end depot (legacy convention: source and sink
+    // share the same location so direct source→sink travel time is 0).
     model::Node sink_depot = parsed_nodes[0];
     sink_depot.id = static_cast<NodeId>(parsed_nodes.size());
     problem->add_node(sink_depot);
