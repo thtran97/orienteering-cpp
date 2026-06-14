@@ -39,7 +39,7 @@ model::Solution GraspVnsSolver::solve(const model::Problem&       problem,
     for (int iter = 0; ; ++iter) {
         double elapsed = std::chrono::duration<double>(Clock::now() - t_start).count();
         if (elapsed >= config.max_cpu_time) break;
-        if (iter >= config.max_iterations)  break;
+        if (config.max_iterations > 0 && iter >= config.max_iterations) break;
 
         // ---- 1. Init ----
         model::Solution                         current;

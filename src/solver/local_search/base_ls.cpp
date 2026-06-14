@@ -435,33 +435,6 @@ void BaseLSUtils::destroy(model::Solution& solution,
 // Local search helpers
 // ---------------------------------------------------------------------------
 
-Time BaseLSUtils::propagate_through_subseq(Time departure_from_start,
-                                           const std::vector<NodeId>& subseq,
-                                           NodeId end_node) const
-{
-    Time t    = departure_from_start;
-    NodeId prev = (subseq.empty() ? end_node : subseq[0]); // set below
-    // We need the node before subseq[0]; caller provides departure_from_start
-    // which already accounts for it.  So just propagate forward.
-    for (int i = 0; i < static_cast<int>(subseq.size()); ++i) {
-        NodeId cur = subseq[i];
-        NodeId prv = (i == 0) ? end_node : subseq[i - 1]; // placeholder; see note
-        // We can't reuse 'prv' from outside, so we need a different approach:
-        // departure_from_start is departure of the node BEFORE subseq[0].
-        // On first iteration we compute travel from that implicit prev node.
-        // To handle this correctly, the caller must pass the prev node separately.
-        // This method is called with departure_from_start already accounting for
-        // travel from prev to subseq[0], so we just need subseq propagation.
-        // Actually simpler: store prev node in the method signature.
-        (void)prv; // unused — see overload below
-        (void)cur;
-        break;
-    }
-    // Use the correct propagation below (called via the overload with prev node)
-    (void)t; (void)prev;
-    return INF; // not directly called; see overloads used in check_swap/check_2opt
-}
-
 // Internal helper: propagate from 'departure after prev_node' through subseq to end_node.
 static Time propagate(const model::Problem& problem,
                       NodeId prev_node,

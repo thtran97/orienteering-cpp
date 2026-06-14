@@ -6,7 +6,7 @@ namespace oplib::solver::constructive {
 double RewardOnlyEvaluator::evaluate(
     const Problem& problem,
     NodeId customer,
-    Time travel_time_cost
+    Time /*travel_time_cost*/
 ) const {
     // Score is simply the reward of the customer
     return problem.get_reward(customer);

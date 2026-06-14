@@ -64,7 +64,6 @@ public:
     virtual void preprocessing() {
         size_t n = nodes.size();
         allowed_arcs.assign(n, std::vector<bool>(n, true));
-        NodeId source = get_source_depot();
         NodeId sink = get_sink_depot();
 
         for (size_t i = 0; i < n; ++i) {

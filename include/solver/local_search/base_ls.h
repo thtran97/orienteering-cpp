@@ -220,18 +220,6 @@ private:
     double heuristic_score(NodeId customer, Time time_shift, int alpha) const;
 
     /**
-     * @brief Propagate departure time through a node sequence, checking TW.
-     *
-     * @param departure_from_start  Departure time from the node before subseq[0].
-     * @param subseq                Ordered list of node IDs to traverse.
-     * @param end_node              Node immediately after the last of subseq.
-     * @return Arrival time at end_node, or INF if any TW is violated.
-     */
-    Time propagate_through_subseq(Time departure_from_start,
-                                  const std::vector<NodeId>& subseq,
-                                  NodeId end_node) const;
-
-    /**
      * @brief Check a swap move between pos1 and pos2; returns shift at next[pos2] or INF.
      *
      * A negative shift means the move reduces makespan.

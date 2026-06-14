@@ -88,7 +88,7 @@ MCTSNode* MCTSSolver::expand(MCTSNode* node,
 }
 
 double MCTSSolver::simulate(MCTSNode* node,
-                             const model::Problem& problem,
+                             const model::Problem& /*problem*/,
                              local_search::BaseLSUtils& ls,
                              const local_search::LSConfig& ls_cfg) const
 {
