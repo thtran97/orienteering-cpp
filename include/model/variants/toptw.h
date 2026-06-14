@@ -14,6 +14,7 @@ public:
 
     bool is_multi_vehicle() const override { return num_vehicles > 1; }
     int get_num_vehicles() const override { return num_vehicles; }
+    void set_num_vehicles(int n) { num_vehicles = n; }
 
 private:
     int num_vehicles;
