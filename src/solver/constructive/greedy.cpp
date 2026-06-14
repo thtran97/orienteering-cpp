@@ -33,10 +33,10 @@ model::Solution GreedySolver::solve(const model::Problem& problem, const GreedyS
     visited[problem.get_source_depot()] = true;
     visited[problem.get_sink_depot()] = true;
 
-    // Initialize route contexts for incremental update 
+    // Initialize route contexts for incremental update
     // (arrival/departure/max_shift/budget)
     std::vector<RouteContext> route_contexts(num_vehicles);
-    
+
     // Base route time is the direct source→sink distance; this seeds the budget
     // check so that cumulative_time always represents the TOTAL trip time, not
     // just the extra detour added on top of the direct leg.
@@ -50,7 +50,7 @@ model::Solution GreedySolver::solve(const model::Problem& problem, const GreedyS
         route_contexts[v].max_shift = {std::numeric_limits<Time>::max(), std::numeric_limits<Time>::max()};
         route_contexts[v].cumulative_time = base_trip_time;
     }
-    
+
     // clear cache before starting construction
     infeasibility_cache.clear();
 
@@ -70,7 +70,7 @@ model::Solution GreedySolver::solve(const model::Problem& problem, const GreedyS
         solution.total_reward += problem.get_reward(best_move.customer);
         solution.total_travel_time += best_move.time_shift;
     }
-    
+
     return solution;
 }
 
@@ -213,26 +213,26 @@ FeasibilityResult GreedySolver::check_insertion_feasible(
     const std::vector<RouteContext>& route_contexts
 ) const {
     FeasibilityResult result;
-    
+
     const auto& route = solution.get_route(vehicle);
     const auto& context = route_contexts[vehicle];
-    
+
     // Validate position bounds
     if (position < 1 || position >= static_cast<int>(route.size())) {
         result.feasible = false;
         return result;
     }
-    
+
     NodeId prev = route[position - 1];
     NodeId next = route[position];
     Time departure_from_prev = context.departure_times[position - 1];
-    
-    // Compute times for the inserted customer
-    auto times = compute_insertion_times(problem, prev, customer, departure_from_prev);
-    Time arrival_at_customer = std::get<0>(times);
-    Time departure_from_customer = std::get<1>(times);
-    
-    // Check if the customer's time window is violated
+
+    // KEY FIX: Use absolute time tracking like toptwLib
+    // Compute arrival at customer based on travel from predecessor
+    Time travel_time_to_customer = problem.get_travel_time(prev, customer, departure_from_prev);
+    Time arrival_at_customer = departure_from_prev + travel_time_to_customer;
+
+    // Check time window at customer - if too late, infeasible
     const auto& tw_customer = problem.get_time_window(customer);
     if (arrival_at_customer > tw_customer.closing) {
         result.feasible = false;
@@ -240,50 +240,52 @@ FeasibilityResult GreedySolver::check_insertion_feasible(
         result.arrival_time_at_customer = arrival_at_customer;
         return result;
     }
-    
-    // Compute travel times for cost calculation
+
+    // Start service at customer (wait if needed, then service)
+    Time start_service_at_customer = std::max(arrival_at_customer, tw_customer.opening);
+    Time departure_from_customer = start_service_at_customer + problem.get_service_time(customer);
+
+    // Compute cost as extra travel time needed
     Time old_travel_time = problem.get_travel_time(prev, next, departure_from_prev);
-    Time new_travel_time_to_customer = problem.get_travel_time(prev, customer, departure_from_prev);
     Time new_travel_time_from_customer = problem.get_travel_time(customer, next, departure_from_customer);
-    Time travel_time_cost = (new_travel_time_to_customer + new_travel_time_from_customer) - old_travel_time;
-    
-    // Check time budget constraint (if applicable)
+    Time travel_time_cost = (travel_time_to_customer + new_travel_time_from_customer) - old_travel_time;
+
+    // Check if total travel time still fits in budget
     Time budget = problem.get_budget();
     if (context.cumulative_time + travel_time_cost > budget) {
         result.feasible = false;
         result.travel_time_cost = travel_time_cost;
         return result;
     }
-    
-    if (problem.has_time_windows()){
-        // Check if next node can still be reached within its time window
-        Time arrival_at_next = departure_from_customer + new_travel_time_from_customer;
-        const auto& tw_next = problem.get_time_window(next);
-        
-        if (arrival_at_next > tw_next.closing) {
+
+    // Check if next node can still be reached within its time window
+    Time arrival_at_next = departure_from_customer + new_travel_time_from_customer;
+    const auto& tw_next = problem.get_time_window(next);
+
+    if (arrival_at_next > tw_next.closing) {
+        result.feasible = false;
+        result.travel_time_cost = travel_time_cost;
+        result.arrival_time_at_customer = arrival_at_customer;
+        result.departure_time_from_customer = departure_from_customer;
+        return result;
+    }
+
+    // Optional: Check max_shift constraint if available (incremental update)
+    // max_shift[position-1] indicates how much delay that node can tolerate
+    if (position > 0 && context.max_shift[position - 1] < std::numeric_limits<Time>::max()) {
+        // Time shift is how much later the next node will depart
+        Time time_shift = (departure_from_customer + new_travel_time_from_customer) -
+                        (departure_from_prev + old_travel_time);
+        // Allow small numerical tolerance
+        if (time_shift > context.max_shift[position - 1] + 1e-6) {
             result.feasible = false;
             result.travel_time_cost = travel_time_cost;
             result.arrival_time_at_customer = arrival_at_customer;
             result.departure_time_from_customer = departure_from_customer;
             return result;
         }
-        
-        // Optional: Check max_shift constraint if available
-        // max_shift[position-1] indicates how much delay that node can tolerate
-        if (position > 0 && context.max_shift[position - 1] < std::numeric_limits<Time>::max()) {
-            Time time_shift = (departure_from_customer + new_travel_time_from_customer) - 
-                            (departure_from_prev + old_travel_time);
-            // Allow small numerical tolerance
-            if (time_shift > context.max_shift[position - 1] + 1e-6) {
-                result.feasible = false;
-                result.travel_time_cost = travel_time_cost;
-                result.arrival_time_at_customer = arrival_at_customer;
-                result.departure_time_from_customer = departure_from_customer;
-                return result;
-            }
-        }
     }
-    
+
     // All constraints satisfied
     result.feasible = true;
     result.travel_time_cost = travel_time_cost;

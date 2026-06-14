@@ -40,6 +40,25 @@ public:
     model::Solution solve(const model::Problem&                       problem,
                           const ILSRouteRecombinationSolverConfig&    config);
 
+    /**
+     * @brief Route-recombination operator (set-packing over a pool of routes).
+     *
+     * Gathers every route from the pooled solutions, greedily selects the
+     * highest-reward set of customer-disjoint routes (a max-weight set-packing
+     * heuristic), assigns each selected route to a vehicle, then repairs any
+     * leftover customers. Because vehicles are independent in TOP/TOPTW, a route
+     * feasible in its origin solution stays feasible when reassigned, so the
+     * recombined solution is always feasible.
+     *
+     * Public + static so it can be unit-tested in isolation. This is the
+     * route-level counterpart to toptwLib's route_recombinator/combinator.
+     */
+    static model::Solution recombine_routes(
+        const model::Problem&               problem,
+        const std::vector<model::Solution>& pool,
+        local_search::BaseLSUtils&          ls,
+        const local_search::LSConfig&       ls_cfg);
+
 private:
     /// Add solution to elite pool if sufficiently different from existing members.
     void add_to_pool(std::vector<model::Solution>& pool,
@@ -50,6 +69,13 @@ private:
     /// Compute Hamming similarity: fraction of customers shared between two solutions.
     double hamming_similarity(const model::Solution& a, const model::Solution& b,
                               int num_nodes) const;
+
+    /// Recompute the visited flags and per-vehicle RouteContext for `sol`.
+    static void rebuild_bookkeeping(local_search::BaseLSUtils&                ls,
+                                    const model::Problem&                     problem,
+                                    const model::Solution&                    sol,
+                                    std::vector<bool>&                        visited,
+                                    std::vector<local_search::RouteContext>&  ctx);
 };
 
 } // namespace oplib::solver::metaheuristic

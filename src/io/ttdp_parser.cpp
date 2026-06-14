@@ -19,7 +19,6 @@ std::unique_ptr<model::Problem> TTDPParser::read(const std::string& filepath) {
     int depot_i;
     double depot_x, depot_y;
     double depot_d, depot_S;
-    double depot_open, depot_close;
     if (!(file >> depot_i >> depot_x >> depot_y >> depot_d >> depot_S)) return nullptr;
     // consume remaining tokens of depot line if any
     file >> std::ws;

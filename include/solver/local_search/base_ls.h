@@ -31,7 +31,7 @@ struct RouteContext {
  */
 struct LSConfig {
     int    alpha          = 2;    // reward exponent in heuristic score: reward^alpha/(shift+eps)
-    int    rcl_size       = 5;    // restricted candidate list size
+    int    rcl_size       = 5;    // RCL cap: top-K candidates kept; selection by weighted roulette
     double removal_ratio  = 0.4;  // fraction of route customers removed by destroy()
 };
 
@@ -94,7 +94,7 @@ public:
      * @param solution   Modified in-place: customers inserted into routes.
      * @param visited    Modified in-place: inserted customers marked as visited.
      * @param contexts   Modified in-place: RouteContexts kept in sync.
-     * @param config     RCL parameters (alpha, rcl_size).
+     * @param config     alpha controls score weighting; rcl_size caps the candidate list.
      */
     void repair(model::Solution& solution,
                 std::vector<bool>& visited,
@@ -218,18 +218,6 @@ private:
      * @brief Heuristic score for RCL: reward^alpha / (time_shift + epsilon).
      */
     double heuristic_score(NodeId customer, Time time_shift, int alpha) const;
-
-    /**
-     * @brief Propagate departure time through a node sequence, checking TW.
-     *
-     * @param departure_from_start  Departure time from the node before subseq[0].
-     * @param subseq                Ordered list of node IDs to traverse.
-     * @param end_node              Node immediately after the last of subseq.
-     * @return Arrival time at end_node, or INF if any TW is violated.
-     */
-    Time propagate_through_subseq(Time departure_from_start,
-                                  const std::vector<NodeId>& subseq,
-                                  NodeId end_node) const;
 
     /**
      * @brief Check a swap move between pos1 and pos2; returns shift at next[pos2] or INF.

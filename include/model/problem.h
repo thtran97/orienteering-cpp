@@ -45,8 +45,8 @@ public:
     virtual Time get_budget() const { return 1e18; }
 
     // Constraints & Metadata (only relevant for problems with time windows)
-    virtual const TimeWindow& get_time_window(NodeId i) const { return default_time_window; }
-    virtual Time get_service_time(NodeId i) const { return 0.0; }
+    virtual const TimeWindow& get_time_window(NodeId /*i*/) const { return default_time_window; }
+    virtual Time get_service_time(NodeId /*i*/) const { return 0.0; }
     
     // Logic utilities
     // Default is time-independent, which does not use departure_time. Time-dependent variants should override this.
