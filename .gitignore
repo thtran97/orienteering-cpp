@@ -41,3 +41,5 @@ results/*
 logs/*
 *.csv
 benchmark_run.log
+build*/
+.github/
