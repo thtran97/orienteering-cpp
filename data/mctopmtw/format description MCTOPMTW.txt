@@ -1,0 +1,56 @@
+***************************
+* MCTOPMTW test instances *
+***************************
+
+The first line contains the following data:
+
+	M N B E1 E2 E3 E4 E5 E6 E7 E8 E9 E10
+
+Where
+	M = number of tours
+	N = number of vertices
+	B = budget limitation
+	Ez = maximum allowed number of vertices of type Z
+
+The second line contains the starting point:
+
+	i x y d S 0 C E
+
+Where
+	i = vertex number = 0
+	x = x coordinate
+	y = y coordinate
+	d = visiting duration = 0	
+	S = score of the location = 0
+	O = opening of time window (start of the tour)
+	C = closing of time window (end of the tour)
+	
+
+The remaining lines contain the data of each point. 
+For each point, the line contains the following data:
+
+	i x y d S O1 O2 O3 O4 C4 E b e1 e2 e3 e4 e5 e6 e7 e7 e8 e9 e10 
+
+Where
+	i = vertex number
+	x = x coordinate
+	y = y coordinate
+	d = visiting duration	
+	S = score of the location
+	O1 = opening of first time window (earliest time for start of service)
+        O2 = opening of second time window (= closing of the first time window = C1)
+        O3 = opening of third time window (= closing of the second time window = C2)
+        O4 = opening of fourth time window (= closing of the third time window = C3)
+	C4 = closing of fourth time window (latest time for start of service)
+	E = time windows normal or exchanged
+		E=1: time windows 1 and 3 are used in tour 1 and 3 and time windows 2 and 4 are used in tour 2 and 4
+		E=0: time windows 2 and 4 are used in tour 1 and 3 and time windows 1 and 3 are used in tour 2 and 4
+	b = entrance fee
+	ez = vertex of type z? 0 = no; 1 = yes.
+
+* REMARKS *
+	- The first point (vertex number 0) is the starting AND ending point (vertex number 1).
+	- The first regular point has vertex number 2. 
+	- The time budget per path (Tmax) equals the closing time of the starting point.
+	- The Euclidean distance is used and rounded down to the first decimal for the Solomon instances 
+		and to the second decimal for the instances of Cordeau et al.

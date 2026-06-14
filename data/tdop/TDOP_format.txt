@@ -1,0 +1,74 @@
+TD OP format
+The TD-OP requires 3 types of input files:
+- the speed matrix
+- the adapted TOP instances of Chao
+- the arc category matrix
+
+*****************************
+* The speed matrix *
+*****************************
+
+This matrix (speedmatrix.txt) (size k*c) contains a speed level for every time period (k) and arc category type (c).
+For all our instances k is set to 4 and c to 5.
+time period 0 7am-9am
+time period 1 9am-5pm
+time period 2 5pm-7pm
+time period 3 7pm-12pm
+
+arc category 0: Always busy
+arc category 1: Morning peak
+arc category 2: Two peak
+arc category 3: Evening peak
+arc category 4: Seldom traveled
+
+The same speed matrix is used for all instances.
+
+*****************************
+* Adapted TOP instances *
+*****************************
+
+These instances were developed by Chao et al 1994 (The team orienteering problem, European Journal of Operations Research 88, 464-474)
+The original instances, divided into 7 dataset based on the underlying graphs, are developed by altering the number of paths and Tmax.
+
+We fixed the number of paths, P, to 1 and rescaled the coordinates to allow more feasibles routes per day. The coordinates in the original datasets were divided by a specific factor per dataset in order to obtain the datasets in the attached files.
+Since we assumed that trips start at the start depot at 7 am and end at the end depot before 9 pm, varying the avalaible travel time (Tmax) within this range allows to create multiple instances based on the same graph information.
+
+The first three lines of the instance txt-file contains the following data:
+n N
+m P
+tmax Tmax
+
+Where
+N = number of vertices
+P = number of paths (in these instances always 1)
+Tmax = available time budget per path
+
+
+
+The remaining lines contain the data of each vertex.
+For each vertex, the line contains the following data:
+
+x y S
+
+Where
+x = x coordinate
+y = y coordinate
+S = score
+
+* REMARKS *
+- The first vertex is the start vertex.
+- The last vertex is the end vertex.
+- The Euclidian distance is used. The result is divided by 5 for each instance to allow more feasibles routes per day. (This is a generic rescaling for all datasets, different from the one mentioned above.)
+
+*****************************
+* Arc category matrix *
+*****************************
+
+This matrix (arc_cat_x.txt) of size N² defines the arc category of every arc between two vertices.
+Since all test instances belonging to the same dataset are based on the same graph, the same arc category matrix can be used for every instance belonging to that dataset.
+
+arc category 0: Always busy
+arc category 1: Morning peak
+arc category 2: Two peak
+arc category 3: Evening peak
+arc category 4: Seldom traveled

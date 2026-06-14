@@ -34,7 +34,7 @@
 # Build folder
 build/*
 .vscode/*
-data/*
+data/singlesat/*
 
 # Output files
 results/*

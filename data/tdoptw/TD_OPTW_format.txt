@@ -1,0 +1,48 @@
+The TD-OPTW algorithm requires 3 input files: 
+- A TD-OPTW instance linked to a dataset
+- The time-independent travel time of the dataset
+- The time-dependent travel time of the dataset
+
+*****************************
+*    TD-OPTW instance       *
+*****************************
+
+The instances are divided into 4 datasets based on their number of vertices. Each instance requires the time-independent and time-dependent travel time information of its corresponding dataset.
+
+The first three lines of the instance txt-file contain the following data: 
+	N 
+	Tmax
+
+Where
+	N	= number of vertices
+	Tmax 	= maximum total travel time
+
+The remaining lines contain the data of each vertex. 
+For each vertex, the line contains the following data:
+
+	id;s;pen;p;o;c
+
+Where
+	id	= ignore this number
+	s	= score
+	pen 	= ignore this number
+	p	= service time in miliseconds
+	o	= opening time in miliseconds
+	c	= closing time in miliseconds
+* REMARKS *
+	- The first vertex is the start vertex.
+	- The last vertex is the end vertex.
+
+***********************************************
+*    Time-independent travel time, filename:  titt*.txt  *
+***********************************************
+
+This matrix of size N� defines the time-independent travel time for every virtual arc between two vertices.
+
+*******************************************
+*    Time-dependent travel time, filename: tt*.txt   *
+*******************************************
+
+This file holds N*N*56 travel time estimates separated by a semicolon. For every virtual arc between two vertices there are 56 timeslots with a size equal to 15 minutes, spanning a time period ranging from 6am to 8pm.
+The given travel time estimate corresponds to the travel time when departing a the beginning of the particular timeslot.
+
