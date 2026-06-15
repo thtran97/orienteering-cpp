@@ -134,28 +134,29 @@ TEST_F(TOPTWParserTest, CordeauTest) {
     // num_vehicles from header col 0 = 5
     EXPECT_EQ(problem->get_num_vehicles(), 5);
 
-    // Budget = depot tw_close = 1000 (not 48, which is num_customers)
-    EXPECT_DOUBLE_EQ(problem->get_budget(), 1000.0);
+    // Budget = depot tw_close = 1000 in the file, scaled by 100 for centesimal precision.
+    // Cordeau pr* instances use time_scale=100 so all times are multiplied by 100.
+    EXPECT_DOUBLE_EQ(problem->get_budget(), 100000.0);
 
-    // Depot (node 0): tw_open=0, tw_close=1000
+    // Depot (node 0): tw_open=0, tw_close=1000 → scaled to [0, 100000]
     EXPECT_DOUBLE_EQ(problem->get_time_window(0).opening, 0.0);
-    EXPECT_DOUBLE_EQ(problem->get_time_window(0).closing, 1000.0);
+    EXPECT_DOUBLE_EQ(problem->get_time_window(0).closing, 100000.0);
 
-    // Node 1 (group 1–12, 1 combo code): tw=[354, 509], reward=12, service=2
-    EXPECT_DOUBLE_EQ(problem->get_time_window(1).opening, 354.0);
-    EXPECT_DOUBLE_EQ(problem->get_time_window(1).closing, 509.0);
+    // Node 1 (group 1–12, 1 combo code): tw=[354, 509] → scaled to [35400, 50900], reward=12, service=200
+    EXPECT_DOUBLE_EQ(problem->get_time_window(1).opening, 35400.0);
+    EXPECT_DOUBLE_EQ(problem->get_time_window(1).closing, 50900.0);
     EXPECT_EQ(problem->get_reward(1), 12);
 
-    // Node 13 (group 13–24, 2 combo codes): tw=[368, 528], reward=9, service=2
+    // Node 13 (group 13–24, 2 combo codes): tw=[368, 528] → scaled to [36800, 52800], reward=9, service=200
     // Bug: the old parser read 3 fixed dummies and got tw=[10, 368] here.
-    EXPECT_DOUBLE_EQ(problem->get_time_window(13).opening, 368.0);
-    EXPECT_DOUBLE_EQ(problem->get_time_window(13).closing, 528.0);
+    EXPECT_DOUBLE_EQ(problem->get_time_window(13).opening, 36800.0);
+    EXPECT_DOUBLE_EQ(problem->get_time_window(13).closing, 52800.0);
     EXPECT_EQ(problem->get_reward(13), 9);
 
-    // Node 25 (group 25–48, 4 combo codes): tw=[360, 505], reward=14, service=4
+    // Node 25 (group 25–48, 4 combo codes): tw=[360, 505] → scaled to [36000, 50500], reward=14, service=400
     // Bug: the old parser got tw=[2, 4] here, making all nodes 25-48 infeasible.
-    EXPECT_DOUBLE_EQ(problem->get_time_window(25).opening, 360.0);
-    EXPECT_DOUBLE_EQ(problem->get_time_window(25).closing, 505.0);
+    EXPECT_DOUBLE_EQ(problem->get_time_window(25).opening, 36000.0);
+    EXPECT_DOUBLE_EQ(problem->get_time_window(25).closing, 50500.0);
     EXPECT_EQ(problem->get_reward(25), 14);
 }
 

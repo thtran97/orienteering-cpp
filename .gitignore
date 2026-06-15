@@ -43,3 +43,6 @@ logs/*
 benchmark_run.log
 build*/
 .github/
+
+# External reference repositories cloned locally
+OPTW_Pulse/

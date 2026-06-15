@@ -32,19 +32,18 @@ struct BaseILSSolverConfig : public SolverConfig {
  */
 class BaseILSSolver : public Solver {
 public:
-    model::Solution solve(const model::Problem& problem,
-                          const SolverConfig& config) override final;
+    model::Solution solve(const model::Problem& problem, const SolverConfig& config) override final;
 
 protected:
-    static void construct(local_search::BaseLSUtils& ls,
-                          const local_search::LSConfig& ls_cfg,
-                          int num_vehicles,
-                          model::Solution& sol,
-                          std::vector<bool>& vis,
-                          std::vector<local_search::RouteContext>& ctx);
+    static void construct(
+        local_search::BaseLSUtils& ls,
+        const local_search::LSConfig& ls_cfg,
+        int num_vehicles,
+        model::Solution& sol,
+        std::vector<bool>& vis,
+        std::vector<local_search::RouteContext>& ctx);
 
-    virtual model::Solution do_solve(const model::Problem& problem,
-                                     const BaseILSSolverConfig& config) = 0;
+    virtual model::Solution do_solve(const model::Problem& problem, const BaseILSSolverConfig& config) = 0;
 };
 
 } // namespace oplib::solver::metaheuristic

@@ -14,6 +14,8 @@ struct ILS09SolverConfig : public BaseILSSolverConfig {};
 
 /**
  * @brief Iterated Local Search 2009 (ILS09) metaheuristic.
+ * 
+ * Vansteenwegen, P., Souffriau, W., Vanden Berghe, G., & Van Oudheusden, D. (2009). Iterated local search for the team orienteering problem with time windows. Computers & Operations Research, 36(12), 3281-3290.
  *
  * Algorithm:
  *  1. construct() — repair() + minimize_makespan() per vehicle.
@@ -31,12 +33,10 @@ public:
     std::string get_name() const override { return "ILS09"; }
 
     using BaseILSSolver::solve;
-    model::Solution solve(const model::Problem& problem,
-                          const ILS09SolverConfig& config);
+    model::Solution solve(const model::Problem& problem, const ILS09SolverConfig& config);
 
 protected:
-    model::Solution do_solve(const model::Problem& problem,
-                             const BaseILSSolverConfig& config) override;
+    model::Solution do_solve(const model::Problem& problem, const BaseILSSolverConfig& config) override;
 };
 
 } // namespace oplib::solver::metaheuristic

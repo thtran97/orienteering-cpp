@@ -250,81 +250,15 @@ static Opts parse_args(int argc, char** argv) {
 // Main
 // ============================================================================
 
-static std::unique_ptr<TOPTWProblem> create_toptw_with_vehicles(
+static std::unique_ptr<Problem> create_toptw_with_vehicles(
     const std::string& filepath,
     int num_vehicles)
 {
-    std::ifstream file(filepath);
-    if (!file.is_open()) {
-        return nullptr;
-    }
-
-    std::string line;
-    double tmax_raw = 0.0;
-    double time_scale = 1.0;  // No scaling - data is already in correct units
-
-    // Line 1: num_vehicles, ???, budget, ???
-    if (std::getline(file, line)) {
-        std::stringstream ss(line);
-        int dummy_vehicles;
-        double dummy;
-        ss >> dummy_vehicles >> dummy >> tmax_raw;
-    }
-
-    // Skip line 2
-    if (std::getline(file, line)) {}
-
-    auto problem = std::make_unique<TOPTWProblem>(filepath, num_vehicles,
-                                                   tmax_raw * time_scale);
-    problem->set_scaling(ScalingMode::SCALED_INTEGER, time_scale);
-
-    std::vector<Node> parsed_nodes;
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        std::stringstream ss(line);
-        Node node;
-        double dummy1, dummy2, dummy3;
-        double first_tw;
-
-        // Try to read all possible values
-        if (!(ss >> node.id >> node.x >> node.y >> node.service_time >> node.reward
-              >> dummy1 >> dummy2 >> dummy3)) {
-            continue;
-        }
-
-        // Now try to read time windows - could be 1 or 2 values
-        if (!(ss >> first_tw)) {
-            // No time windows at all (shouldn't happen)
-            node.tw.opening = 0.0;
-            node.tw.closing = 1e18;
-        } else {
-            // We read one value. Check if there's another
-            double second_tw;
-            if (ss >> second_tw) {
-                // Two values: opening and closing
-                node.tw.opening = first_tw;
-                node.tw.closing = second_tw;
-            } else {
-                // One value: treat as closing time, opening defaults to 0
-                node.tw.opening = 0.0;
-                node.tw.closing = first_tw;
-            }
-        }
-
-        parsed_nodes.push_back(node);
-    }
-
-    if (parsed_nodes.empty()) return nullptr;
-
-    for (const auto& node : parsed_nodes) {
-        problem->add_node(node);
-    }
-
-    Node sink_depot = parsed_nodes[0];
-    sink_depot.id = static_cast<NodeId>(parsed_nodes.size());
-    problem->add_node(sink_depot);
-
-    problem->finalize();
+    io::TOPTWParser parser;
+    auto problem = parser.read(filepath);
+    if (!problem) return nullptr;
+    auto* toptw = dynamic_cast<variants::TOPTWProblem*>(problem.get());
+    if (toptw) toptw->set_num_vehicles(num_vehicles);
     return problem;
 }
 

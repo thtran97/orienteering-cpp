@@ -1,3 +1,9 @@
+/*
+ILS solver implementation for TOPTW
+
+Reference: "Vansteenwegen, P., Souffriau, W., Vanden Berghe, G., & Van Oudheusden, D. (2009). Iterated local search for the team orienteering problem with time windows. Computers & Operations Research, 36(12), 3281-3290."
+*/
+
 #include <chrono>
 #include <iostream>
 
@@ -6,14 +12,16 @@
 
 namespace oplib::solver::metaheuristic {
 
-model::Solution ILS09Solver::solve(const model::Problem& problem,
-                                    const ILS09SolverConfig& config)
+model::Solution ILS09Solver::solve(
+    const model::Problem& problem,
+    const ILS09SolverConfig& config)
 {
     return do_solve(problem, config);
 }
 
-model::Solution ILS09Solver::do_solve(const model::Problem&      problem,
-                                       const BaseILSSolverConfig& config)
+model::Solution ILS09Solver::do_solve(
+    const model::Problem& problem,
+    const BaseILSSolverConfig& config)
 {
     using Clock = std::chrono::high_resolution_clock;
 
@@ -65,8 +73,7 @@ model::Solution ILS09Solver::do_solve(const model::Problem&      problem,
             shake_length = 1;
             no_impr      = 0;
             if (config.verbose)
-                std::cout << "[ILS09] iter=" << iter
-                          << " reward=" << best.total_reward << '\n';
+                std::cout << "[ILS09] iter=" << iter << " reward=" << best.total_reward << '\n';
         } else {
             ++no_impr;
             if (no_impr >= config.restart_threshold) {

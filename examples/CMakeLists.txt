@@ -3,9 +3,6 @@ message("[INFO] Start configuring examples directory: ${CMAKE_CURRENT_SOURCE_DIR
 add_executable(check_dummy check_dummy.cpp)
 target_link_libraries(check_dummy orienteeringLib)
 
-add_executable(benchmark_lns_cordeau benchmark_lns_cordeau.cpp)
-target_link_libraries(benchmark_lns_cordeau orienteeringLib)
-
 add_executable(solve_op solve_op.cpp)
 target_link_libraries(solve_op orienteeringLib)
 
@@ -29,17 +26,14 @@ target_link_libraries(benchmark_exact orienteeringLib)
 add_executable(benchmark_toptw_vehicles benchmark_toptw_vehicles.cpp)
 target_link_libraries(benchmark_toptw_vehicles orienteeringLib)
 
-add_executable(debug_greedy_toptw debug_greedy_toptw.cpp)
-target_link_libraries(debug_greedy_toptw orienteeringLib)
-
 add_executable(test_toptw_quick test_toptw_quick.cpp)
 target_link_libraries(test_toptw_quick orienteeringLib)
 
-add_executable(test_rand_greedy_5s test_rand_greedy_5s.cpp)
-target_link_libraries(test_rand_greedy_5s orienteeringLib)
-
-add_executable(test_metaheuristics_5s test_metaheuristics_5s.cpp)
-target_link_libraries(test_metaheuristics_5s orienteeringLib)
-
 add_executable(benchmark_lns_sensitivity benchmark_lns_sensitivity.cpp)
 target_link_libraries(benchmark_lns_sensitivity orienteeringLib)
+
+add_executable(benchmark_pulse_pr01 benchmark_pulse_pr01.cpp)
+target_link_libraries(benchmark_pulse_pr01 orienteeringLib)
+
+add_executable(benchmark_pulse_cordeau benchmark_pulse_cordeau.cpp)
+target_link_libraries(benchmark_pulse_cordeau orienteeringLib)

@@ -100,6 +100,7 @@ struct BenchmarkOptions {
     bool                     no_progress = false;
     bool                     overwrite  = false; ///< if true, ignore existing CSV and re-run everything
     int                      quick      = 0;     ///< >0: run only this many instances per variant
+    int                      pulse_labels = 0;   ///< pulse label budget (0 = unlimited)
 };
 
 // ============================================================================
@@ -436,7 +437,17 @@ static RunResult run_once(const std::string& solver_name,
 
     try {
         auto t0 = std::chrono::high_resolution_clock::now();
-        Solution sol = solver->solve(problem, cfg);
+        Solution sol;
+        if (solver_name == "pulse") {
+            pulse::PulseSolverConfig ps_cfg;
+            ps_cfg.seed         = cfg.seed;
+            ps_cfg.max_cpu_time = cfg.max_cpu_time;
+            ps_cfg.verbose      = cfg.verbose;
+            ps_cfg.max_labels   = opts.pulse_labels; // 0 = unlimited
+            sol = static_cast<pulse::PulseSolver*>(solver.get())->solve(problem, ps_cfg);
+        } else {
+            sol = solver->solve(problem, cfg);
+        }
         auto t1 = std::chrono::high_resolution_clock::now();
 
         r.cpu_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
@@ -546,6 +557,9 @@ Options:
   --quick     -q  [<n>]          Run only the first n instances per variant
                                  (default n=3 when flag is present).
                                  Useful for a fast sanity-check of all solvers.
+  --pulse-labels  <n>            Label budget for the pulse solver (0 = unlimited).
+                                 Default: 0 (unlimited). Raise or lower for exact vs.
+                                 heuristic behavior.
   --verbose                      Pass verbose flag to solvers.
   --no-progress                  Suppress per-instance progress output.
   --help      -h                 Show this help.
@@ -604,12 +618,13 @@ static BenchmarkOptions parse_args(int argc, char** argv)
             if (!variants_set) { opts.variants.clear(); variants_set = true; }
             for (auto& n : names) opts.variants.push_back(n);
         }
-        else if (a == "--instance"   || a == "-i") opts.instance   = next();
-        else if (a == "--timeout"    || a == "-t") opts.timeout    = std::stod(next());
-        else if (a == "--output"     || a == "-o") opts.output     = next();
-        else if (a == "--iterations")              opts.iterations = std::stoi(next());
-        else if (a == "--seed")                    opts.seed       = std::stoi(next());
-        else if (a == "--runs")                    opts.runs       = std::stoi(next());
+        else if (a == "--instance"    || a == "-i") opts.instance     = next();
+        else if (a == "--timeout"     || a == "-t") opts.timeout      = std::stod(next());
+        else if (a == "--output"      || a == "-o") opts.output       = next();
+        else if (a == "--iterations")               opts.iterations   = std::stoi(next());
+        else if (a == "--seed")                     opts.seed         = std::stoi(next());
+        else if (a == "--runs")                     opts.runs         = std::stoi(next());
+        else if (a == "--pulse-labels")             opts.pulse_labels = std::stoi(next());
         else {
             std::cerr << "[WARN] Unknown argument: " << a << '\n';
         }
