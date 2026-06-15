@@ -15,6 +15,7 @@
 #include "solver/metaheuristic/grasp_vns.h"
 #include "solver/metaheuristic/lns.h"
 #include "solver/metaheuristic/ils09.h"
+#include "solver/metaheuristic/ils15.h"
 #include "solver/metaheuristic/ils_route_recombination.h"
 #include "solver/metaheuristic/sails.h"
 
@@ -30,16 +31,10 @@ static std::unique_ptr<TOPTWProblem> load_toptw(const std::string& filepath, int
     if (!file.is_open()) return nullptr;
 
     std::string line;
-    double tmax_raw = 0.0;
-    if (std::getline(file, line)) {
-        std::stringstream ss(line);
-        int dv; double d; ss >> dv >> d >> tmax_raw;
-    }
+    if (std::getline(file, line)) {}  // skip line 1 (header: k v N t — Tmax comes from depot TW)
     if (std::getline(file, line)) {}  // skip line 2
 
-    auto problem = std::make_unique<TOPTWProblem>(filepath, num_vehicles, tmax_raw);
-    problem->set_scaling(ScalingMode::SCALED_INTEGER, 1.0);
-
+    // Read all nodes first so we can get Tmax from depot's closing time window.
     std::vector<Node> nodes;
     while (std::getline(file, line)) {
         if (line.empty()) continue;
@@ -57,6 +52,13 @@ static std::unique_ptr<TOPTWProblem> load_toptw(const std::string& filepath, int
         nodes.push_back(node);
     }
     if (nodes.empty()) return nullptr;
+
+    // Tmax = depot's closing time window (Cordeau format spec).
+    double tmax = nodes[0].tw.closing;
+
+    auto problem = std::make_unique<TOPTWProblem>(filepath, num_vehicles, tmax);
+    problem->set_scaling(ScalingMode::RAW, 1.0);
+
     for (const auto& n : nodes) problem->add_node(n);
     Node sink = nodes[0];
     sink.id = static_cast<NodeId>(nodes.size());
@@ -107,12 +109,17 @@ int main(int argc, char** argv) {
     int    max_iters     = iters_set ? std::stoi(argv[2]) : 0;
     // Optional argv[3]: single instance filter (e.g. "c101"); default both.
     std::string only_inst = (argc > 3) ? argv[3] : "";
+    // Optional argv[5]: random seed (default 42).
+    int seed = (argc > 5) ? std::stoi(argv[5]) : 42;
+    // Optional argv[6]: fixed vehicle count to run (0 = run 1..4, default).
+    int fixed_v = (argc > 6) ? std::stoi(argv[6]) : 0;
 
     std::vector<std::pair<std::string, Factory>> solvers = {
         {"rand_greedy", []{ return std::make_unique<constructive::RandomizedGreedySolver>(); }},
         {"grasp_vns",   []{ return std::make_unique<metaheuristic::GraspVnsSolver>(); }},
         {"lns",         []{ return std::make_unique<metaheuristic::LNSSolver>(); }},
         {"ils09",       []{ return std::make_unique<metaheuristic::ILS09Solver>(); }},
+        {"ils15",       []{ return std::make_unique<metaheuristic::ILS15Solver>(); }},
         {"ils_rr",      []{ return std::make_unique<metaheuristic::ILSRouteRecombinationSolver>(); }},
         {"sails",       []{ return std::make_unique<metaheuristic::SAILSSolver>(); }},
     };
@@ -146,12 +153,14 @@ int main(int argc, char** argv) {
 
     for (const auto& inst : instances) {
         for (const auto& [name, factory] : solvers) {
-            for (int v = 1; v <= 4; ++v) {
+            int v_lo = (fixed_v > 0) ? fixed_v : 1;
+            int v_hi = (fixed_v > 0) ? fixed_v : 4;
+            for (int v = v_lo; v <= v_hi; ++v) {
                 auto problem = load_toptw("data/toptw/" + inst + ".txt", v);
                 if (!problem) { std::cout << inst << ": load failed\n"; continue; }
 
                 SolverConfig config;
-                config.seed = 42;
+                config.seed = seed;
                 config.max_cpu_time = time_limit;
                 if (iters_set) config.max_iterations = max_iters;  // 0 => lift cap
 

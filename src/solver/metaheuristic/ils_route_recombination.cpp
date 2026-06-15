@@ -39,9 +39,6 @@ void ILSRouteRecombinationSolver::add_to_pool(std::vector<model::Solution>& pool
                                                int                            pool_size,
                                                double                         similarity_threshold) const
 {
-    // Check similarity against existing pool members.
-    // Build a flat set of each member's customers (all vehicles combined) for O(1)
-    // lookup, reducing the per-member check from O(V·n²) to O(V·n).
     for (const auto& member : pool) {
         std::unordered_set<NodeId> member_customers;
         for (int v = 0; v < member.get_num_vehicles(); ++v) {
@@ -59,13 +56,12 @@ void ILSRouteRecombinationSolver::add_to_pool(std::vector<model::Solution>& pool
             }
         }
         double sim = (total_cust == 0) ? 1.0 : static_cast<double>(shared) / total_cust;
-        if (sim > similarity_threshold) return; // too similar — don't add
+        if (sim > similarity_threshold) return;
     }
 
     if (static_cast<int>(pool.size()) < pool_size) {
         pool.push_back(sol);
     } else {
-        // Replace the worst pool member
         auto worst = std::min_element(pool.begin(), pool.end(),
             [](const model::Solution& x, const model::Solution& y){
                 return x.total_reward < y.total_reward;
@@ -111,13 +107,12 @@ model::Solution ILSRouteRecombinationSolver::recombine_routes(
     const NodeId src  = problem.get_source_depot();
     const NodeId sink = problem.get_sink_depot();
 
-    // 1. Gather candidate routes (customer subsequences) from every pool member.
     struct Candidate { Reward reward; std::vector<NodeId> customers; };
     std::vector<Candidate> candidates;
     for (const auto& sol : pool) {
         for (int v = 0; v < sol.get_num_vehicles(); ++v) {
             const auto& r = sol.get_route(v);
-            if (r.size() <= 2) continue;  // depot-only route
+            if (r.size() <= 2) continue;
             std::vector<NodeId> customers(r.begin() + 1, r.end() - 1);
             Reward reward = 0.0;
             for (NodeId c : customers) reward += problem.get_reward(c);
@@ -125,7 +120,6 @@ model::Solution ILSRouteRecombinationSolver::recombine_routes(
         }
     }
 
-    // 2. Greedily pick the highest-reward customer-disjoint routes (set packing).
     std::sort(candidates.begin(), candidates.end(),
               [](const Candidate& a, const Candidate& b) { return a.reward > b.reward; });
 
@@ -151,11 +145,10 @@ model::Solution ILSRouteRecombinationSolver::recombine_routes(
     for (int v = assigned; v < nv; ++v)
         recombined.get_route(v) = {src, sink};
 
-    // 3. Rebuild bookkeeping, repair leftover customers, then minimise makespan.
     std::vector<bool>                       visited;
     std::vector<local_search::RouteContext> ctx;
     rebuild_bookkeeping(ls, problem, recombined, visited, ctx);
-    recombined.total_reward = placed_reward;  // repair() increments from here
+    recombined.total_reward = placed_reward;
     ls.repair(recombined, visited, ctx, ls_cfg);
     for (int v = 0; v < nv; ++v)
         ls.minimize_makespan(recombined, ctx, v);
@@ -164,52 +157,46 @@ model::Solution ILSRouteRecombinationSolver::recombine_routes(
 }
 
 // ---------------------------------------------------------------------------
-// Solve
+// Typed solve — forwards directly to do_solve
 // ---------------------------------------------------------------------------
-
-model::Solution ILSRouteRecombinationSolver::solve(const model::Problem& problem,
-                                                    const SolverConfig&   config)
-{
-    ILSRouteRecombinationSolverConfig cfg;
-    cfg.seed              = config.seed;
-    cfg.max_cpu_time      = config.max_cpu_time;
-    cfg.max_iterations    = config.max_iterations;
-    cfg.verbose           = config.verbose;
-    return solve(problem, cfg);
-}
 
 model::Solution ILSRouteRecombinationSolver::solve(
     const model::Problem&                    problem,
     const ILSRouteRecombinationSolverConfig& config)
 {
+    return do_solve(problem, config);
+}
+
+// ---------------------------------------------------------------------------
+// do_solve
+// ---------------------------------------------------------------------------
+
+model::Solution ILSRouteRecombinationSolver::do_solve(
+    const model::Problem&      problem,
+    const BaseILSSolverConfig& base_cfg)
+{
     using Clock = std::chrono::high_resolution_clock;
 
-    oplib::utils::Random      rng(static_cast<uint32_t>(config.seed));
+    const auto* cfg_ptr = dynamic_cast<const ILSRouteRecombinationSolverConfig*>(&base_cfg);
+    int    pool_size            = cfg_ptr ? cfg_ptr->pool_size            : 10;
+    double similarity_threshold = cfg_ptr ? cfg_ptr->similarity_threshold : 0.5;
+
+    oplib::utils::Random      rng(static_cast<uint32_t>(base_cfg.seed));
     local_search::BaseLSUtils ls(problem, rng);
     local_search::LSConfig    ls_cfg;
-    ls_cfg.alpha    = config.alpha;
-    ls_cfg.rcl_size = config.rcl_size;
+    ls_cfg.alpha    = base_cfg.alpha;
+    ls_cfg.rcl_size = base_cfg.rcl_size;
 
     const int nv = problem.get_num_vehicles();
 
-    auto construct = [&](model::Solution&                         sol,
-                         std::vector<bool>&                       vis,
-                         std::vector<local_search::RouteContext>& ctx)
-    {
-        ls.repair(sol, vis, ctx, ls_cfg);
-        for (int v = 0; v < nv; ++v)
-            ls.minimize_makespan(sol, ctx, v);
-    };
-
-    // Initial solution
     model::Solution                         best;
     std::vector<bool>                       best_vis;
     std::vector<local_search::RouteContext> best_ctx;
     ls.init(best, best_vis, best_ctx);
-    construct(best, best_vis, best_ctx);
+    construct(ls, ls_cfg, nv, best, best_vis, best_ctx);
 
     std::vector<model::Solution> elite_pool;
-    add_to_pool(elite_pool, best, config.pool_size, config.similarity_threshold);
+    add_to_pool(elite_pool, best, pool_size, similarity_threshold);
 
     model::Solution                         current  = best;
     std::vector<bool>                       cur_vis  = best_vis;
@@ -220,9 +207,12 @@ model::Solution ILSRouteRecombinationSolver::solve(
 
     auto t_start = Clock::now();
 
-    for (int iter = 0; config.max_iterations <= 0 || iter < config.max_iterations; ++iter) {
+    for (int iter = 0;
+         base_cfg.max_iterations <= 0 || iter < base_cfg.max_iterations;
+         ++iter)
+    {
         double elapsed = std::chrono::duration<double>(Clock::now() - t_start).count();
-        if (elapsed >= config.max_cpu_time) break;
+        if (elapsed >= base_cfg.max_cpu_time) break;
 
         // Perturb
         for (int v = 0; v < nv; ++v) {
@@ -232,7 +222,7 @@ model::Solution ILSRouteRecombinationSolver::solve(
             int pos = rng.next_int(1, nc);
             ls.shake(current, cur_vis, cur_ctx, v, pos, shake_length);
         }
-        construct(current, cur_vis, cur_ctx);
+        construct(ls, ls_cfg, nv, current, cur_vis, cur_ctx);
 
         // Acceptance
         if (current.total_reward > best.total_reward) {
@@ -241,30 +231,30 @@ model::Solution ILSRouteRecombinationSolver::solve(
             best_ctx     = cur_ctx;
             shake_length = 1;
             no_impr      = 0;
-            add_to_pool(elite_pool, best, config.pool_size, config.similarity_threshold);
-            if (config.verbose)
-                std::cout << "[ILS+RR] iter=" << iter << " reward=" << best.total_reward << '\n';
+            add_to_pool(elite_pool, best, pool_size, similarity_threshold);
+            if (base_cfg.verbose)
+                std::cout << "[ILS+RR] iter=" << iter
+                          << " reward=" << best.total_reward << '\n';
         } else {
             ++no_impr;
         }
 
-        // Route recombination when stagnating: rebuild a solution from the best
-        // customer-disjoint routes seen across the elite pool.
-        if (no_impr >= config.restart_threshold && !elite_pool.empty()) {
+        // Route recombination when stagnating
+        if (no_impr >= base_cfg.restart_threshold && !elite_pool.empty()) {
             model::Solution recombined = recombine_routes(problem, elite_pool, ls, ls_cfg);
 
             if (recombined.total_reward > best.total_reward) {
                 best = recombined;
                 rebuild_bookkeeping(ls, problem, best, best_vis, best_ctx);
-                add_to_pool(elite_pool, best, config.pool_size, config.similarity_threshold);
+                add_to_pool(elite_pool, best, pool_size, similarity_threshold);
                 shake_length = 1;
-                if (config.verbose)
-                    std::cout << "[ILS+RR] recombination -> " << best.total_reward << '\n';
+                if (base_cfg.verbose)
+                    std::cout << "[ILS+RR] recombination -> "
+                              << best.total_reward << '\n';
             } else {
                 ++shake_length;
             }
 
-            // Restart the walk from the incumbent best.
             current = best;
             cur_vis = best_vis;
             cur_ctx = best_ctx;

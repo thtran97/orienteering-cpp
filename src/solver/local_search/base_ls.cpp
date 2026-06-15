@@ -548,6 +548,66 @@ void BaseLSUtils::apply_2opt(model::Solution& solution,
 }
 
 // ---------------------------------------------------------------------------
+// Replace
+// ---------------------------------------------------------------------------
+
+bool BaseLSUtils::replace(model::Solution& solution,
+                          std::vector<bool>& visited,
+                          std::vector<RouteContext>& contexts,
+                          int vehicle)
+{
+    const int    nn   = static_cast<int>(problem_.get_num_nodes());
+    const NodeId src  = problem_.get_source_depot();
+    const NodeId sink = problem_.get_sink_depot();
+    bool any_replaced = false;
+
+    // All non-depot nodes sorted by reward descending; visited[] checked per iteration.
+    std::vector<NodeId> all_customers;
+    all_customers.reserve(nn);
+    for (NodeId c = 0; c < nn; ++c) {
+        if (c != src && c != sink)
+            all_customers.push_back(c);
+    }
+    std::sort(all_customers.begin(), all_customers.end(),
+              [&](NodeId a, NodeId b) {
+                  return problem_.get_reward(a) > problem_.get_reward(b);
+              });
+
+    bool restart = true;
+    while (restart) {
+        restart = false;
+        for (NodeId u : all_customers) {
+            if (visited[u]) continue;
+
+            const auto& route = solution.get_route(vehicle);
+            const int rsz = static_cast<int>(route.size());
+
+            for (int p = 1; p < rsz - 1; ++p) {
+                NodeId cur = route[p];
+                if (problem_.get_reward(u) <= problem_.get_reward(cur)) continue;
+
+                // Tentatively remove cur; check if u fits at position p.
+                model::Solution           tmp_sol = solution;
+                std::vector<bool>         tmp_vis = visited;
+                std::vector<RouteContext> tmp_ctx = contexts;
+                remove_customer_at(tmp_sol, tmp_ctx, tmp_vis, vehicle, p);
+                double shift = check_insertion(tmp_sol, tmp_ctx, vehicle, u, p);
+                if (shift >= INF) continue;
+
+                // Commit: apply same removal + insertion on real state.
+                remove_customer_at(solution, contexts, visited, vehicle, p);
+                apply_insertion(solution, contexts, visited, vehicle, u, p, shift);
+                any_replaced = true;
+                restart      = true;
+                break;
+            }
+            if (restart) break;
+        }
+    }
+    return any_replaced;
+}
+
+// ---------------------------------------------------------------------------
 // Minimize makespan
 // ---------------------------------------------------------------------------
 

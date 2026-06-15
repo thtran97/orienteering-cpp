@@ -151,6 +151,22 @@ public:
                            std::vector<RouteContext>& contexts,
                            int vehicle);
 
+    /**
+     * @brief Replace scheduled customers with higher-reward unscheduled ones.
+     *
+     * For each unscheduled customer u (descending reward order), tries replacing
+     * each scheduled position p in `vehicle`'s route.  Accepts the first (u, p)
+     * pair where u is feasible at p after removal of the existing customer AND
+     * u's reward strictly exceeds the removed customer's reward.  Restarts after
+     * each accepted replacement.  Repeats until no improving replacement is found.
+     *
+     * @return true if at least one replacement was applied.
+     */
+    bool replace(model::Solution& solution,
+                 std::vector<bool>& visited,
+                 std::vector<RouteContext>& contexts,
+                 int vehicle);
+
     // -----------------------------------------------------------------------
     // Feasibility checking (public for use by concrete solvers)
     // -----------------------------------------------------------------------
