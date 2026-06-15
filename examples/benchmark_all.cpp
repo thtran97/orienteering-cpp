@@ -46,7 +46,12 @@
 
 namespace fs_compat {
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+inline bool create_dir(const std::string& p) { return _mkdir(p.c_str()) == 0; }
+#else
 inline bool create_dir(const std::string& p) { return mkdir(p.c_str(), 0755) == 0; }
+#endif
 inline bool exists(const std::string& p) { struct stat s{}; return stat(p.c_str(), &s) == 0; }
 } // namespace fs_compat
 
@@ -433,7 +438,11 @@ static std::string today_str()
     auto now = std::chrono::system_clock::now();
     std::time_t t = std::chrono::system_clock::to_time_t(now);
     std::tm tm{};
+#ifdef _WIN32
+    localtime_s(&tm, &t);
+#else
     localtime_r(&t, &tm);
+#endif
     char buf[16];
     std::strftime(buf, sizeof(buf), "%y%m%d", &tm);
     return buf;
