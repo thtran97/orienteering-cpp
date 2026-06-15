@@ -1,3 +1,9 @@
+/* 
+Implementation of the ILS solver for OPTW
+
+Reference: Gunawan, A., Lau, H. C., & Lu, K. (2015, March). An iterated local search algorithm for solving the orienteering problem with time windows. In European conference on evolutionary computation in combinatorial optimization (pp. 61-73). Cham: Springer International Publishing.
+*/
+
 #include <algorithm>
 #include <chrono>
 #include <iostream>
@@ -7,14 +13,16 @@
 
 namespace oplib::solver::metaheuristic {
 
-model::Solution ILS15Solver::solve(const model::Problem& problem,
-                                    const ILS15SolverConfig& config)
+model::Solution ILS15Solver::solve(
+    const model::Problem& problem,
+    const ILS15SolverConfig& config)
 {
     return do_solve(problem, config);
 }
 
-model::Solution ILS15Solver::do_solve(const model::Problem&      problem,
-                                       const BaseILSSolverConfig& base_cfg)
+model::Solution ILS15Solver::do_solve(
+    const model::Problem& problem, 
+    const BaseILSSolverConfig& base_cfg)
 {
     using Clock = std::chrono::high_resolution_clock;
 
@@ -51,8 +59,8 @@ model::Solution ILS15Solver::do_solve(const model::Problem&      problem,
     auto t_start = Clock::now();
 
     for (int iter = 0;
-         base_cfg.max_iterations <= 0 || iter < base_cfg.max_iterations;
-         ++iter)
+        base_cfg.max_iterations <= 0 || iter < base_cfg.max_iterations; 
+        ++iter)
     {
         double elapsed = std::chrono::duration<double>(Clock::now() - t_start).count();
         if (elapsed >= base_cfg.max_cpu_time) break;
@@ -98,8 +106,7 @@ model::Solution ILS15Solver::do_solve(const model::Problem&      problem,
             shake_counter = 0;
             no_impr       = 0;
             if (base_cfg.verbose)
-                std::cout << "[ILS15] iter=" << iter
-                          << " reward=" << best.total_reward << '\n';
+                std::cout << "[ILS15] iter=" << iter << " reward=" << best.total_reward << '\n';
         } else {
             ++no_impr;
         }

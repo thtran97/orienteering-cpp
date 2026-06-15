@@ -14,6 +14,8 @@ struct ILS15SolverConfig : public BaseILSSolverConfig {
 
 /**
  * @brief ILS from Gunawan, Lau & Lu (2015) for the OPTW.
+ * 
+ * Gunawan, A., Lau, H. C., & Lu, K. (2015, March). An iterated local search algorithm for solving the orienteering problem with time windows. In European conference on evolutionary computation in combinatorial optimization (pp. 61-73). Cham: Springer International Publishing.
  *
  * Distinctive features vs ILS09:
  *  - Always-accept random walk (no strict-improvement gate on current solution).
@@ -30,12 +32,10 @@ public:
     std::string get_name() const override { return "ILS15"; }
 
     using BaseILSSolver::solve;
-    model::Solution solve(const model::Problem& problem,
-                          const ILS15SolverConfig& config);
+    model::Solution solve(const model::Problem& problem, const ILS15SolverConfig& config);
 
 protected:
-    model::Solution do_solve(const model::Problem& problem,
-                             const BaseILSSolverConfig& config) override;
+    model::Solution do_solve(const model::Problem& problem, const BaseILSSolverConfig& config) override;
 };
 
 } // namespace oplib::solver::metaheuristic
