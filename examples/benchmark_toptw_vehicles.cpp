@@ -25,6 +25,9 @@
 #include <vector>
 #include <dirent.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#endif
 
 #include <sstream>
 #include <fstream>
@@ -151,7 +154,11 @@ static std::string today_str()
     auto now = std::chrono::system_clock::now();
     std::time_t t = std::chrono::system_clock::to_time_t(now);
     std::tm tm{};
+#ifdef _WIN32
+    localtime_s(&tm, &t);
+#else
     localtime_r(&t, &tm);
+#endif
     char buf[16];
     std::strftime(buf, sizeof(buf), "%y%m%d_%H%M%S", &tm);
     return buf;
@@ -344,7 +351,11 @@ int main(int argc, char** argv) {
     cfg.verbose = false;
 
     // Prepare output folder
+#ifdef _WIN32
+    _mkdir(opts.output.c_str());
+#else
     mkdir(opts.output.c_str(), 0755);
+#endif
     std::string csv_path = opts.output + "/toptw_benchmark_" + today_str() + ".csv";
     std::ofstream csv(csv_path);
     if (!csv.is_open()) {
