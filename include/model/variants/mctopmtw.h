@@ -17,6 +17,10 @@ public:
         knapsack_coeffs.push_back(std::move(coeffs));
     }
 
+    const std::vector<double>& get_knapsack_rhs() const { return knapsack_rhs; }
+    const std::vector<std::vector<double>>& get_knapsack_coeffs() const { return knapsack_coeffs; }
+    int get_num_knapsack_constraints() const { return static_cast<int>(knapsack_rhs.size()); }
+
     // New variants for multi-TW could be added as a list of TWindows per node
     // For now, let's just hold the knapsack constraints.
 
