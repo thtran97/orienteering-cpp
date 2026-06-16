@@ -30,7 +30,6 @@ class ILSRouteRecombinationSolver : public BaseILSSolver {
 public:
     std::string get_name() const override { return "ILSRouteRecombination"; }
 
-    using BaseILSSolver::solve;
     model::Solution solve(const model::Problem& problem,
                           const ILSRouteRecombinationSolverConfig& config);
 

@@ -9,6 +9,7 @@
 #include "solver/metaheuristic/grasp_vns.h"
 #include "solver/metaheuristic/lns.h"
 #include "solver/metaheuristic/ils09.h"
+#include "solver/metaheuristic/ils15.h"
 #include "solver/metaheuristic/ils_route_recombination.h"
 #include "solver/policy_learning/mcts_solver.h"
 #include "solver/dynamic_programming/dp_solvers.h"
@@ -365,6 +366,63 @@ TEST_F(ILSRRTest, MultiVehicle_PoolDiversityDoesNotCrash) {
         const auto& r = sol.get_route(v);
         for (size_t i = 1; i + 1 < r.size(); ++i) {
             EXPECT_TRUE(all_visited.insert(r[i]).second)
+                << "Node " << r[i] << " visited by multiple vehicles";
+        }
+    }
+}
+
+// ============================================================================
+// Phase 6b — ILS15
+// ============================================================================
+
+class ILS15Test : public ::testing::Test {
+protected:
+    solver::metaheuristic::ILS15SolverConfig cfg;
+    void SetUp() override {
+        cfg.seed                  = 42;
+        cfg.max_iterations        = 20;
+        cfg.max_cpu_time          = 5.0;
+        cfg.restart_threshold     = 5;
+        cfg.post_increment_period = 2;
+    }
+};
+
+TEST_F(ILS15Test, ReturnsPositiveReward_OP) {
+    auto problem = make_op5();
+    solver::metaheuristic::ILS15Solver solver;
+    auto sol = solver.solve(problem, cfg);
+    check_single_vehicle_solution(sol, problem);
+    EXPECT_GT(sol.total_reward, 0.0);
+}
+
+TEST_F(ILS15Test, ReturnsPositiveReward_OPTW) {
+    auto problem = make_optw4();
+    solver::metaheuristic::ILS15Solver solver;
+    auto sol = solver.solve(problem, cfg);
+    check_single_vehicle_solution(sol, problem);
+    EXPECT_GE(sol.total_reward, 0.0);
+}
+
+TEST_F(ILS15Test, MultiVehicle_TOP) {
+    auto problem = make_top6();
+    solver::metaheuristic::ILS15Solver solver;
+    auto sol = solver.solve(problem, cfg);
+    EXPECT_EQ(sol.get_num_vehicles(), 2);
+    for (int v = 0; v < 2; ++v) {
+        EXPECT_EQ(sol.get_route(v).front(), problem.get_source_depot());
+        EXPECT_EQ(sol.get_route(v).back(),  problem.get_sink_depot());
+    }
+}
+
+TEST_F(ILS15Test, NoDuplicateNodesAcrossVehicles) {
+    auto problem = make_top6();
+    solver::metaheuristic::ILS15Solver solver;
+    auto sol = solver.solve(problem, cfg);
+    std::set<NodeId> all_customers;
+    for (int v = 0; v < sol.get_num_vehicles(); ++v) {
+        const auto& r = sol.get_route(v);
+        for (size_t i = 1; i + 1 < r.size(); ++i) {
+            EXPECT_TRUE(all_customers.insert(r[i]).second)
                 << "Node " << r[i] << " visited by multiple vehicles";
         }
     }

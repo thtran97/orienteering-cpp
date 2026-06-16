@@ -38,6 +38,7 @@
 #include "solver/dynamic_programming/dp_solvers.h"
 #include "solver/metaheuristic/grasp_vns.h"
 #include "solver/metaheuristic/ils09.h"
+#include "solver/metaheuristic/ils15.h"
 #include "solver/metaheuristic/ils_route_recombination.h"
 #include "solver/metaheuristic/lns.h"
 #include "solver/policy_learning/mcts_solver.h"
@@ -363,6 +364,7 @@ static const std::vector<std::pair<std::string, SolverFactory>> SOLVER_LIST = {
     {"grasp_vns",   []{ return std::make_unique<metaheuristic::GraspVnsSolver>(); }},
     {"lns",         []{ return std::make_unique<metaheuristic::LNSSolver>(); }},
     {"ils09",       []{ return std::make_unique<metaheuristic::ILS09Solver>(); }},
+    {"ils15",       []{ return std::make_unique<metaheuristic::ILS15Solver>(); }},
     {"ils_rr",      []{ return std::make_unique<metaheuristic::ILSRouteRecombinationSolver>(); }},
     {"mcts",        []{ return std::make_unique<policy_learning::MCTSSolver>(); }},
     {"forward_dp",  []{ return std::make_unique<dp::ForwardDPSolver>(); }},

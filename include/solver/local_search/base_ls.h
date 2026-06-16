@@ -67,9 +67,10 @@ public:
      * the corresponding RouteContext is consistent with that empty route.
      * visited[i] is set to true for the depots and false for all customers.
      */
-    void init(model::Solution& solution,
-              std::vector<bool>& visited,
-              std::vector<RouteContext>& contexts) const;
+    void init(
+        model::Solution& solution,
+        std::vector<bool>& visited,
+        std::vector<RouteContext>& contexts) const;
 
     /**
      * @brief Recompute a RouteContext from scratch for the given route.
@@ -77,8 +78,9 @@ public:
      * Performs a forward pass (arrival/departure times) followed by a backward
      * pass (max_shift values).  Use after any move that invalidates the context.
      */
-    void recompute_context(const std::vector<NodeId>& route,
-                           RouteContext& context) const;
+    void recompute_context(
+        const std::vector<NodeId>& route,
+        RouteContext& context) const;
 
     // -----------------------------------------------------------------------
     // Construction
@@ -113,11 +115,12 @@ public:
      *
      * @param removal_ratio Fraction of route customers to remove (0 < r < 1).
      */
-    void destroy(model::Solution& solution,
-                 std::vector<bool>& visited,
-                 std::vector<RouteContext>& contexts,
-                 int vehicle,
-                 double removal_ratio);
+    void destroy(
+        model::Solution& solution,
+        std::vector<bool>& visited,
+        std::vector<RouteContext>& contexts,
+        int vehicle,
+        double removal_ratio);
 
     /**
      * @brief Remove `length` consecutive customers starting at `position`.
@@ -128,12 +131,13 @@ public:
      * @param position 1-based index into the route (depot is 0).
      * @param length   Number of customers to remove (>= 1).
      */
-    void shake(model::Solution& solution,
-               std::vector<bool>& visited,
-               std::vector<RouteContext>& contexts,
-               int vehicle,
-               int position,
-               int length);
+    void shake(
+        model::Solution& solution,
+        std::vector<bool>& visited,
+        std::vector<RouteContext>& contexts,
+        int vehicle,
+        int position,
+        int length);
 
     // -----------------------------------------------------------------------
     // Local Search
@@ -147,9 +151,27 @@ public:
      *
      * @return true if at least one improving move was applied.
      */
-    bool minimize_makespan(model::Solution& solution,
-                           std::vector<RouteContext>& contexts,
-                           int vehicle);
+    bool minimize_makespan(
+        model::Solution& solution,
+        std::vector<RouteContext>& contexts,
+        int vehicle);
+
+    /**
+     * @brief Replace scheduled customers with higher-reward unscheduled ones.
+     *
+     * For each unscheduled customer u (descending reward order), tries replacing
+     * each scheduled position p in `vehicle`'s route.  Accepts the first (u, p)
+     * pair where u is feasible at p after removal of the existing customer AND
+     * u's reward strictly exceeds the removed customer's reward.  Restarts after
+     * each accepted replacement.  Repeats until no improving replacement is found.
+     *
+     * @return true if at least one replacement was applied.
+     */
+    bool replace(
+        model::Solution& solution,
+        std::vector<bool>& visited,
+        std::vector<RouteContext>& contexts,
+        int vehicle);
 
     // -----------------------------------------------------------------------
     // Feasibility checking (public for use by concrete solvers)
@@ -163,11 +185,12 @@ public:
      *
      * @return The additional travel time incurred (time_shift >= 0), or INF if infeasible.
      */
-    double check_insertion(const model::Solution& solution,
-                           const std::vector<RouteContext>& contexts,
-                           int vehicle,
-                           NodeId customer,
-                           int position) const;
+    double check_insertion(
+        const model::Solution& solution,
+        const std::vector<RouteContext>& contexts,
+        int vehicle,
+        NodeId customer,
+        int position) const;
 
     /**
      * @brief Public wrapper for apply_insertion — allows external solvers to commit
@@ -195,13 +218,14 @@ private:
      * Forward pass: recompute arrival/departure for successors.
      * Backward pass: recompute max_shift for predecessors.
      */
-    void apply_insertion(model::Solution& solution,
-                         std::vector<RouteContext>& contexts,
-                         std::vector<bool>& visited,
-                         int vehicle,
-                         NodeId customer,
-                         int position,
-                         Time time_shift);
+    void apply_insertion(
+        model::Solution& solution,
+        std::vector<RouteContext>& contexts,
+        std::vector<bool>& visited,
+        int vehicle,
+        NodeId customer,
+        int position,
+        Time time_shift);
 
     /**
      * @brief Remove the customer at `position` from the route and update context.

@@ -1,21 +1,21 @@
 #pragma once
 
-#include "solver/solver.h"
-#include "solver/local_search/base_ls.h"
+#include "solver/metaheuristic/base_ils.h"
 
 namespace oplib::solver::metaheuristic {
 
 /**
  * @brief Configuration for the ILS09 solver.
+ *
+ * Inherits alpha, rcl_size, and restart_threshold from BaseILSSolverConfig.
+ * Kept as a named type so callers can construct it explicitly.
  */
-struct ILS09SolverConfig : public SolverConfig {
-    int alpha             = oplib::constants::DEFAULT_ALPHA;
-    int rcl_size          = oplib::constants::DEFAULT_RCL_SIZE;
-    int restart_threshold = 10; ///< no-improvement count before restart from best
-};
+struct ILS09SolverConfig : public BaseILSSolverConfig {};
 
 /**
  * @brief Iterated Local Search 2009 (ILS09) metaheuristic.
+ * 
+ * Vansteenwegen, P., Souffriau, W., Vanden Berghe, G., & Van Oudheusden, D. (2009). Iterated local search for the team orienteering problem with time windows. Computers & Operations Research, 36(12), 3281-3290.
  *
  * Algorithm:
  *  1. construct() — repair() + minimize_makespan() per vehicle.
@@ -28,15 +28,15 @@ struct ILS09SolverConfig : public SolverConfig {
  *
  * Ported from toptwLib/lib/src/solver/local_search/ILS09.cpp.
  */
-class ILS09Solver : public Solver {
+class ILS09Solver : public BaseILSSolver {
 public:
     std::string get_name() const override { return "ILS09"; }
 
-    model::Solution solve(const model::Problem& problem,
-                          const SolverConfig&   config) override;
+    using BaseILSSolver::solve;
+    model::Solution solve(const model::Problem& problem, const ILS09SolverConfig& config);
 
-    model::Solution solve(const model::Problem&   problem,
-                          const ILS09SolverConfig& config);
+protected:
+    model::Solution do_solve(const model::Problem& problem, const BaseILSSolverConfig& config) override;
 };
 
 } // namespace oplib::solver::metaheuristic
