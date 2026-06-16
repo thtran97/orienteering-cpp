@@ -1,8 +1,11 @@
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <iostream>
 
 #include "io/toptw_parser.h"
+
+namespace fs = std::filesystem;
 
 namespace oplib::io {
 
@@ -30,9 +33,22 @@ std::unique_ptr<model::Problem> TOPTWParser::read(const std::string& filepath) {
         return nullptr;
     }
 
-    // time_scale = 1.0: coordinates, service times, and time windows are all in
-    // consistent units; distances are floored to integer travel times.
-    const double time_scale = 1.0;
+    // time_scale = 100.0 for Cordeau TOPTW instances (pr*.txt):
+    // Distances are computed as floor(euclidean * 100) to match the centesimal
+    // precision used in the Cordeau et al. benchmark.
+    // For Solomon instances (c*.txt, r*.txt) use scale=10 (decimetric precision).
+    // Default fallback: scale=1 (raw integer distances).
+    //
+    // Detect instance type from filename to set appropriate scale.
+    const std::string fname = fs::path(filepath).filename().string();
+    double time_scale;
+    if (fname.rfind("pr", 0) == 0) {
+        time_scale = 100.0;  // Cordeau pr* instances: centesimal precision
+    } else if (fname.rfind("r", 0) == 0 || fname.rfind("c", 0) == 0) {
+        time_scale = 10.0;   // Solomon r*/c* instances: decimetric precision
+    } else {
+        time_scale = 1.0;    // other instances: raw integer distances
+    }
 
     std::string line;
     int num_vehicles = 0;
@@ -63,16 +79,22 @@ std::unique_ptr<model::Problem> TOPTWParser::read(const std::string& filepath) {
             double combo;
             if (!(ss >> combo)) break;
         }
-        if (!(ss >> node.tw.opening >> node.tw.closing)) {
+        double tw_open, tw_close;
+        if (!(ss >> tw_open >> tw_close)) {
             continue;
         }
+        // Scale time values to match the chosen time_scale.
+        // All time quantities (service, TW, budget) must be in the same units as
+        // the travel time matrix (which finalize() computes as floor(dist * time_scale)).
+        node.service_time = static_cast<Time>(node.service_time * time_scale);
+        node.tw.opening   = static_cast<Time>(tw_open  * time_scale);
+        node.tw.closing   = static_cast<Time>(tw_close * time_scale);
         parsed_nodes.push_back(node);
     }
 
     if (parsed_nodes.empty()) return nullptr;
 
-    // Budget = depot's closing time window, matching OPGraph::build_graph() which
-    // also sets tmax = source_tw.closing.
+    // Budget = depot's closing time window (already scaled above).
     double tmax = parsed_nodes[0].tw.closing;
 
     auto problem = std::make_unique<model::variants::TOPTWProblem>(filepath, num_vehicles, tmax);

@@ -31,3 +31,6 @@ target_link_libraries(test_toptw_quick orienteeringLib)
 
 add_executable(benchmark_lns_sensitivity benchmark_lns_sensitivity.cpp)
 target_link_libraries(benchmark_lns_sensitivity orienteeringLib)
+
+add_executable(benchmark_pulse_cordeau benchmark_pulse_cordeau.cpp)
+target_link_libraries(benchmark_pulse_cordeau orienteeringLib)
