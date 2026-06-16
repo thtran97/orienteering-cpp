@@ -52,6 +52,7 @@ struct Options {
     bool        overwrite     = false;
     int         quick         = 0;
     int         pulse_labels  = 0;
+    int         vehicles      = 0;  ///< override num_vehicles (0 = from file)
 };
 
 Options parse_cli(int argc, char** argv, const std::string& solver_name);

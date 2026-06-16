@@ -320,6 +320,7 @@ Options:
   --overwrite                    Overwrite existing CSV files.
   --quick     -q  [<n>]          First n instances per variant only.
   --pulse-labels  <n>            Label budget for pulse solver.  (default: 0)
+  --vehicles      <n>            Override number of vehicles.    (default: from file)
   --verbose                      Pass verbose flag to solver.
   --help      -h                 Show this help.
 
@@ -367,6 +368,7 @@ Options parse_cli(int argc, char** argv, const std::string& solver_name)
         else if (a == "--seed")                      opts.seed         = std::stoi(next());
         else if (a == "--runs")                      opts.runs         = std::stoi(next());
         else if (a == "--pulse-labels")              opts.pulse_labels = std::stoi(next());
+        else if (a == "--vehicles")                  opts.vehicles     = std::stoi(next());
         else {
             std::cerr << "[WARN] Unknown argument: " << a << '\n';
         }

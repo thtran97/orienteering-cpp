@@ -24,7 +24,8 @@ public:
     virtual NodeId get_num_nodes() const = 0;
     virtual NodeId get_source_depot() const = 0;
     virtual NodeId get_sink_depot() const = 0;
-    virtual int get_num_vehicles() const { return 1; } 
+    virtual int get_num_vehicles() const { return num_vehicles_; }
+    virtual void set_num_vehicles(int n) { num_vehicles_ = n; }
 
     // Scaling and Precision
     virtual ScalingMode get_scaling_mode() const { return ScalingMode::RAW; }
@@ -62,6 +63,7 @@ public:
 
 private:
     static constexpr TimeWindow default_time_window = {0.0, 1e18}; // Default to "infinity"
+    int num_vehicles_ = 1;
 };
 
 } // namespace oplib::model
