@@ -3,34 +3,30 @@ message("[INFO] Start configuring examples directory: ${CMAKE_CURRENT_SOURCE_DIR
 add_executable(check_dummy check_dummy.cpp)
 target_link_libraries(check_dummy orienteeringLib)
 
-add_executable(solve_op solve_op.cpp)
-target_link_libraries(solve_op orienteeringLib)
-
-add_executable(benchmark_greedy benchmark_greedy.cpp)
-target_link_libraries(benchmark_greedy orienteeringLib)
-
 # NOTE: benchmark_lns / benchmark_grasp / benchmark_randomized_greedy were retired
 # in Phase 0 of MIGRATION.md. They exercised the duplicate
 # local_search::{LNSSolver,GraspSolver} (removed) or relied on the pre-refactor
 # RandomizedGreedyConfig name. All are superseded by benchmark_all / benchmark_exact.
 
-add_executable(benchmark benchmark.cpp)
-target_link_libraries(benchmark orienteeringLib)
 
-add_executable(benchmark_all benchmark_all.cpp)
-target_link_libraries(benchmark_all orienteeringLib)
 
-add_executable(benchmark_exact benchmark_exact.cpp)
-target_link_libraries(benchmark_exact orienteeringLib)
+# Per-solver benchmarks (bench_utils + thin wrappers)
+add_library(bench_utils STATIC bench_utils.cpp)
+target_link_libraries(bench_utils orienteeringLib)
+target_include_directories(bench_utils PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-add_executable(benchmark_toptw_vehicles benchmark_toptw_vehicles.cpp)
-target_link_libraries(benchmark_toptw_vehicles orienteeringLib)
+function(add_bench name)
+    add_executable(bench_${name} bench_${name}.cpp)
+    target_link_libraries(bench_${name} bench_utils)
+endfunction()
 
-add_executable(test_toptw_quick test_toptw_quick.cpp)
-target_link_libraries(test_toptw_quick orienteeringLib)
-
-add_executable(benchmark_lns_sensitivity benchmark_lns_sensitivity.cpp)
-target_link_libraries(benchmark_lns_sensitivity orienteeringLib)
-
-add_executable(benchmark_pulse_cordeau benchmark_pulse_cordeau.cpp)
-target_link_libraries(benchmark_pulse_cordeau orienteeringLib)
+add_bench(lns)
+add_bench(greedy)
+add_bench(rand_greedy)
+add_bench(grasp_vns)
+add_bench(ils09)
+add_bench(ils_rr)
+add_bench(mcts)
+add_bench(forward_dp)
+add_bench(bidir_dp)
+add_bench(pulse)
