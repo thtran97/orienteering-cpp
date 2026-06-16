@@ -44,5 +44,9 @@ benchmark_run.log
 build*/
 .github/
 
+# AI workspace data
+.claire/
+.claude/
+
 # External reference repositories cloned locally
 OPTW_Pulse/
