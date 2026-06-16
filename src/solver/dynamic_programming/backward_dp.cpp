@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <iostream>
 #include <queue>
 
@@ -65,8 +66,15 @@ TrueBackwardDPSolver::compute_backward_labels(
     }
 
     int explored = 0;
+    auto t_start = std::chrono::steady_clock::now();
+    const double time_budget = config.max_cpu_time;
 
     while (!pq.empty()) {
+        if (time_budget > 0 &&
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count() > time_budget) {
+            if (config.verbose) std::cerr << "[TrueBackwardDP] timeout after " << explored << " labels\n";
+            break;
+        }
         Label* lj = pq.top(); pq.pop();
         if (lj->dominated || lj->extended) continue;
         lj->extended = true;

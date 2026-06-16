@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <iostream>
 #include <queue>
 #include <sstream>
@@ -97,14 +98,21 @@ model::Solution ForwardDPSolver::solve(const model::Problem& problem,
 
     Label* best_sink_label = nullptr;
     int    labels_explored = 0;
+    auto t_start = std::chrono::steady_clock::now();
 
     while (!pq.empty()) {
+        if (config.max_cpu_time > 0 && labels_explored % 10000 == 0 &&
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count() > config.max_cpu_time)
+            break;
         Label* li = pq.top(); pq.pop();
         if (li->dominated || li->extended) continue;
         li->extended = true;
 
         ++labels_explored;
         if (config.max_labels > 0 && labels_explored > config.max_labels) break;
+        if (config.max_cpu_time > 0 &&
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count() > config.max_cpu_time)
+            break;
 
         // Extend to all unvisited feasible nodes
         for (NodeId j = 1; j < nn; ++j) {
@@ -164,7 +172,7 @@ model::Solution ForwardDPSolver::solve(const model::Problem& problem,
     }
 
     if (config.verbose)
-        std::cout << "[ForwardDP] best=" << best_sink_label->profit_collected
+        std::cerr << "[ForwardDP] best=" << best_sink_label->profit_collected
                   << " labels=" << labels_explored << '\n';
 
     return reconstruct(best_sink_label, problem);
@@ -295,13 +303,20 @@ model::Solution BidirectionalDPSolver::solve(const model::Problem& problem,
 
     Label* best_sink_label = nullptr;
     int    labels_explored = 0;
+    auto t_start = std::chrono::steady_clock::now();
 
     while (!pq.empty()) {
+        if (config.max_cpu_time > 0 && labels_explored % 10000 == 0 &&
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count() > config.max_cpu_time)
+            break;
         Label* li = pq.top(); pq.pop();
         if (li->dominated || li->extended) continue;
         li->extended = true;
         ++labels_explored;
         if (config.max_labels > 0 && labels_explored > config.max_labels) break;
+        if (config.max_cpu_time > 0 &&
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count() > config.max_cpu_time)
+            break;
 
         for (NodeId j = 1; j < nn; ++j) {
             if (li->is_visited[j]) continue;
@@ -354,7 +369,7 @@ model::Solution BidirectionalDPSolver::solve(const model::Problem& problem,
     }
 
     if (config.verbose)
-        std::cout << "[BidirectionalDP] best="
+        std::cerr << "[BidirectionalDP] best="
                   << (best_sink_label ? best_sink_label->profit_collected : 0.0)
                   << " labels=" << labels_explored << '\n';
 

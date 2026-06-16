@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <numeric>
@@ -85,8 +86,12 @@ Label* DSSRSolver::run_inner_dp(
 
     Label* best_sink = nullptr;
     int    explored  = 0;
+    auto t_start = std::chrono::steady_clock::now();
 
     while (!pq.empty()) {
+        if (config.max_cpu_time > 0 &&
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count() > config.max_cpu_time)
+            break;
         Label* li = pq.top(); pq.pop();
         if (li->dominated || li->extended) continue;
         li->extended = true;
@@ -152,7 +157,7 @@ Label* DSSRSolver::run_inner_dp(
     }
 
     if (config.verbose)
-        std::cout << "[DSSR][inner] explored=" << explored << " hit_cap=" << hit_cap
+            std::cerr << "[DSSR][inner] explored=" << explored << " hit_cap=" << hit_cap
                   << " best_sink=" << (best_sink ? best_sink->profit_collected : -1.0) << '\n';
 
     return best_sink;
@@ -292,8 +297,14 @@ model::Solution DSSRSolver::solve(const model::Problem&   problem,
     std::vector<std::vector<Label*>>    node_labels(nn);
 
     Label* best_sink = nullptr;
+    auto t_start = std::chrono::steady_clock::now();
 
     for (int iter = 0; iter <= config.max_dssr_iters; ++iter) {
+        if (config.max_cpu_time > 0 &&
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count() > config.max_cpu_time) {
+            if (config.verbose) std::cerr << "[DSSR] timeout at iter=" << iter << "\n";
+            break;
+        }
         bool hit_cap = false;
         best_sink = run_inner_dp(problem, config, critical_set, label_pool, node_labels, hit_cap);
 
@@ -304,7 +315,7 @@ model::Solution DSSRSolver::solve(const model::Problem&   problem,
             // elementary run (= ForwardDPSolver semantics) to guarantee a
             // correct result.
             if (config.verbose)
-                std::cout << "[DSSR] iter=" << iter
+                std::cerr << "[DSSR] iter=" << iter
                           << " hit label cap — falling back to full elementarity\n";
             std::fill(critical_set.begin(), critical_set.end(), true);
             critical_set[src]  = false;
@@ -318,7 +329,7 @@ model::Solution DSSRSolver::solve(const model::Problem&   problem,
         if (best_sink == nullptr) {
             // No feasible solution found
             if (config.verbose)
-                std::cout << "[DSSR] iter=" << iter << " no solution\n";
+                std::cerr << "[DSSR] iter=" << iter << " no solution\n";
             break;
         }
 
@@ -327,7 +338,7 @@ model::Solution DSSRSolver::solve(const model::Problem&   problem,
         int max_count = *std::max_element(counts.begin(), counts.end());
 
         if (config.verbose)
-            std::cout << "[DSSR] iter=" << iter
+            std::cerr << "[DSSR] iter=" << iter
                       << " profit=" << best_sink->profit_collected
                       << " max_visits=" << max_count
                       << " |Θ|=" << std::count(critical_set.begin(), critical_set.end(), true)

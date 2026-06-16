@@ -1,10 +1,32 @@
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <queue>
 
 #include "solver/dynamic_programming/dp_solvers.h"
 
 namespace oplib::solver::dp {
+
+namespace {
+
+model::Solution best_sol_from_labels(const std::vector<Label*>& labels,
+                                     NodeId src, NodeId sink,
+                                     const model::Problem& problem) {
+    const Label* best = nullptr;
+    for (const Label* lbl : labels) {
+        if (lbl->dominated) continue;
+        if (best == nullptr || lbl->profit_collected > best->profit_collected)
+            best = lbl;
+    }
+    if (best == nullptr) {
+        model::Solution sol(problem.get_num_vehicles());
+        sol.get_route(0) = {src, sink};
+        return sol;
+    }
+    return ForwardDPSolver::reconstruct(best, problem);
+}
+
+} // anonymous namespace
 
 // ---------------------------------------------------------------------------
 // TrueBidirectionalDPSolver
@@ -134,6 +156,8 @@ model::Solution TrueBidirectionalDPSolver::solve(const model::Problem& problem,
         problem.get_time_window(src).opening + problem.get_budget()
     );
     const Time   half = T / 2.0;
+    auto t_start = std::chrono::steady_clock::now();
+    const double time_budget = config.max_cpu_time;
 
     // ------------------------------------------------------------------
     // Phase 1: Forward DP (half-resource stopping)
@@ -158,6 +182,11 @@ model::Solution TrueBidirectionalDPSolver::solve(const model::Problem& problem,
 
         int explored = 0;
         while (!pq.empty()) {
+            if (time_budget > 0 &&
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count() > time_budget) {
+                if (config.verbose) std::cerr << "[TrueBidir] forward timeout after " << explored << " labels\n";
+                break;
+            }
             Label* li = pq.top(); pq.pop();
             if (li->dominated || li->extended) continue;
             li->extended = true;
@@ -205,7 +234,14 @@ model::Solution TrueBidirectionalDPSolver::solve(const model::Problem& problem,
         }
 
         if (config.verbose)
-            std::cout << "[TrueBidir] forward labels explored=" << explored << '\n';
+            std::cerr << "[TrueBidir] forward labels explored=" << explored << '\n';
+    }
+
+    // Check if forward phase timed out
+    if (time_budget > 0 &&
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count() > time_budget) {
+        if (config.verbose) std::cerr << "[TrueBidir] timeout before backward phase\n";
+        return best_sol_from_labels(fw_labels[sink], src, sink, problem);
     }
 
     // ------------------------------------------------------------------
@@ -226,21 +262,28 @@ model::Solution TrueBidirectionalDPSolver::solve(const model::Problem& problem,
     model::Solution best_sol(problem.get_num_vehicles());
     best_sol.get_route(0) = {src, sink};
 
-    for (Label* lbl : fw_labels[sink]) {
-        if (lbl->dominated) continue;
-        if (lbl->profit_collected > best_reward) {
-            best_reward = lbl->profit_collected;
-            best_sol = ForwardDPSolver::reconstruct(lbl, problem);
+    {
+        auto candidate = best_sol_from_labels(fw_labels[sink], src, sink, problem);
+        if (candidate.total_reward > best_reward) {
+            best_reward = candidate.total_reward;
+            best_sol = std::move(candidate);
         }
     }
 
     // ------------------------------------------------------------------
     // Phase 4: Match forward labels with backward labels
     // ------------------------------------------------------------------
+    int match_count = 0;
     for (NodeId i = 0; i < nn; ++i) {
         if (i == sink) continue;
         for (Label* fw : fw_labels[i]) {
             if (fw->dominated) continue;
+
+            if (++match_count % 1000 == 0 && time_budget > 0 &&
+                std::chrono::duration<double>(std::chrono::steady_clock::now() - t_start).count() > time_budget) {
+                if (config.verbose) std::cerr << "[TrueBidir] match timeout\n";
+                goto done;
+            }
 
             // Try all adjacent j (backward label is at j; we join via arc i→j)
             for (NodeId j = 0; j < nn; ++j) {
@@ -251,9 +294,10 @@ model::Solution TrueBidirectionalDPSolver::solve(const model::Problem& problem,
             }
         }
     }
+done:
 
     if (config.verbose)
-        std::cout << "[TrueBidir] best=" << best_reward << '\n';
+        std::cerr << "[TrueBidir] best=" << best_reward << '\n';
 
     return best_sol;
 }
