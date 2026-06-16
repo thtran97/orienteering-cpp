@@ -246,11 +246,8 @@ model::Solution BackwardDPSolver::solve(const model::Problem& problem,
 model::Solution BackwardDPSolver::solve(const model::Problem& problem,
                                          const DPSolverConfig& config)
 {
-    // BackwardDP is primarily a bounding oracle.
-    // For solve(), delegate to ForwardDP to return an actual solution.
-    ForwardDPSolver fwd;
-    DPSolverConfig fwd_cfg = config;
-    return fwd.solve(problem, fwd_cfg);
+    // For solve(), delegate to TrueBackwardDPSolver for a proper backward-DP solution.
+    return TrueBackwardDPSolver().solve(problem, config);
 }
 
 // ---------------------------------------------------------------------------
