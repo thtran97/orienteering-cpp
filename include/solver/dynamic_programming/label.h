@@ -41,14 +41,18 @@ struct Label {
     }
 
     /// Dominance check: this label dominates `other` if it is at least as good
-    /// on all criteria (time ≤, profit ≥, visited ⊆).
+    /// on all criteria (time ≤, profit ≥, visited ⊆) with at least one strict.
     bool dominates(const Label& other) const {
-        if (time_consumed  > other.time_consumed)  return false;
+        if (time_consumed    > other.time_consumed)    return false;
         if (profit_collected < other.profit_collected) return false;
-        // visited subset check
         for (size_t i = 0; i < is_visited.size(); ++i)
             if (is_visited[i] && !other.is_visited[i]) return false;
-        return true;
+        // At least one dimension must be strictly better
+        if (time_consumed    < other.time_consumed)    return true;
+        if (profit_collected > other.profit_collected) return true;
+        for (size_t i = 0; i < is_visited.size(); ++i)
+            if (!is_visited[i] && other.is_visited[i]) return true;
+        return false;
     }
 
     std::string to_string() const;
