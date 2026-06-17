@@ -543,7 +543,7 @@ TEST_F(GreedySolverTest, RealInstance_TOP_Set1) {
 // Test 14: Real TOPTW instance - Solomon benchmark
 // ================================
 TEST_F(GreedySolverTest, RealInstance_TOPTW_Solomon) {
-    std::string filepath = get_greedy_test_data_path("toptw/c101.txt");
+    std::string filepath = get_greedy_test_data_path("toptw/Solomon/c101.txt");
     
     TOPTWParser parser;
     auto problem = parser.read(filepath);
@@ -604,7 +604,7 @@ TEST_F(GreedySolverTest, RealInstance_TOPTW_Solomon) {
 // Test 15: Real TOPTW instance - Cordeau benchmark
 // ================================
 TEST_F(GreedySolverTest, RealInstance_TOPTW_Cordeau) {
-    std::string filepath = get_greedy_test_data_path("toptw/pr01.txt");
+    std::string filepath = get_greedy_test_data_path("toptw/Cordeau/pr01.txt");
     
     TOPTWParser parser;
     auto problem = parser.read(filepath);

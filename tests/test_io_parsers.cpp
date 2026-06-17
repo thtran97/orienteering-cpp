@@ -106,7 +106,7 @@ protected:
 };
 
 TEST_F(TOPTWParserTest, SolomonTest) {
-    std::string filepath = get_data_path("toptw/c101.txt");
+    std::string filepath = get_data_path("toptw/Solomon/c101.txt");
     auto problem = parser.read(filepath);
     
     ASSERT_NE(problem, nullptr);
@@ -122,7 +122,7 @@ TEST_F(TOPTWParserTest, SolomonTest) {
 }
 
 TEST_F(TOPTWParserTest, CordeauTest) {
-    std::string filepath = get_data_path("toptw/pr01.txt");
+    std::string filepath = get_data_path("toptw/Cordeau/pr01.txt");
     auto problem = parser.read(filepath);
 
     ASSERT_NE(problem, nullptr);

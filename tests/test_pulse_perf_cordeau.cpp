@@ -56,43 +56,43 @@ protected:
 };
 
 TEST_F(PulseCordeauPerf, pr01) {
-    auto problem = parser.read(get_perf_data_path("toptw/pr01.txt"));
+    auto problem = parser.read(get_perf_data_path("toptw/Cordeau/pr01.txt"));
     ASSERT_NE(problem, nullptr);
     check_perf(*problem, 308, "pr01", 500.0);
 }
 
 TEST_F(PulseCordeauPerf, pr02) {
-    auto problem = parser.read(get_perf_data_path("toptw/pr02.txt"));
+    auto problem = parser.read(get_perf_data_path("toptw/Cordeau/pr02.txt"));
     ASSERT_NE(problem, nullptr);
     check_perf(*problem, 404, "pr02", 2000.0);
 }
 
 TEST_F(PulseCordeauPerf, pr03) {
-    auto problem = parser.read(get_perf_data_path("toptw/pr03.txt"));
+    auto problem = parser.read(get_perf_data_path("toptw/Cordeau/pr03.txt"));
     ASSERT_NE(problem, nullptr);
     check_perf(*problem, 394, "pr03", 3000.0);
 }
 
 TEST_F(PulseCordeauPerf, pr04) {
-    auto problem = parser.read(get_perf_data_path("toptw/pr04.txt"));
+    auto problem = parser.read(get_perf_data_path("toptw/Cordeau/pr04.txt"));
     ASSERT_NE(problem, nullptr);
     check_perf(*problem, 489, "pr04", 5000.0);
 }
 
 TEST_F(PulseCordeauPerf, pr05) {
-    auto problem = parser.read(get_perf_data_path("toptw/pr05.txt"));
+    auto problem = parser.read(get_perf_data_path("toptw/Cordeau/pr05.txt"));
     ASSERT_NE(problem, nullptr);
     check_perf(*problem, 595, "pr05", 60000.0);
 }
 
 TEST_F(PulseCordeauPerf, pr07) {
-    auto problem = parser.read(get_perf_data_path("toptw/pr07.txt"));
+    auto problem = parser.read(get_perf_data_path("toptw/Cordeau/pr07.txt"));
     ASSERT_NE(problem, nullptr);
     check_perf(*problem, 298, "pr07", 500.0);
 }
 
 TEST_F(PulseCordeauPerf, pr08) {
-    auto problem = parser.read(get_perf_data_path("toptw/pr08.txt"));
+    auto problem = parser.read(get_perf_data_path("toptw/Cordeau/pr08.txt"));
     ASSERT_NE(problem, nullptr);
     check_perf(*problem, 463, "pr08", 2000.0);
 }

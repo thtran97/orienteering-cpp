@@ -14,6 +14,8 @@ namespace oplib::solver::dp {
 // DSSRSolver — Decremental State Space Relaxation (Righini & Salani 2006 §4)
 // ---------------------------------------------------------------------------
 //
+// Righini, G., & Salani, M. (2006). Dynamic programming for the orienteering problem with time windows.
+//
 // Outer loop: maintain a critical vertex set Θ.  Only Θ-nodes enforce
 // elementarity in the inner DP; non-critical nodes may be revisited freely.
 //
@@ -34,20 +36,17 @@ namespace oplib::solver::dp {
 // revisit, a profitable zero/low-cost cycle among non-critical nodes can
 // generate astronomically many mutually non-dominated labels (each lap is
 // strictly more time *and* more profit than the last, so nothing dominates
-// it) before the search exhausts the time budget. config.max_labels (or
-// kDefaultRelaxedCap below if unset) bounds this; if the cap is hit, the
-// caller falls back to a fully elementary run, which is bounded by the
-// (finite) 2^|customers| elementary state space — exactly ForwardDPSolver's
-// search space, already verified against brute force.
-
-namespace {
-// Kept small deliberately: dominance checks against a node's label list are
-// O(list size), and a hot cycling node's list grows ~linearly with explored
-// count, making total work ~quadratic in the cap. A full elementary fallback
-// run (small 2^|customers| state space) finishes well under this limit for
-// realistic instance sizes.
-constexpr int kDefaultRelaxedCap = 3000;
-}
+// it) before the search exhausts the time budget. config.max_labels bounds
+// this when explicitly set (>0); if the cap is hit, the caller falls back to
+// a fully elementary run, which is bounded by the (finite) 2^|customers|
+// elementary state space — exactly ForwardDPSolver's search space, already
+// verified against brute force.
+//
+// config.max_labels == 0 means "unlimited" (same convention as every other
+// DPSolverConfig-based solver): the explored-count cap is disabled and only
+// config.max_cpu_time bounds the search. Do NOT substitute a small default
+// cap here — callers that pass 0 expect exact/unbounded behavior (see
+// test_exact_optimality.cpp, test_dp_improvements.cpp's unlimited_cfg()).
 
 // ---------------------------------------------------------------------------
 
@@ -62,7 +61,6 @@ Label* DSSRSolver::run_inner_dp(
     const int    nn   = static_cast<int>(problem.get_num_nodes());
     const NodeId src  = problem.get_source_depot();
     const NodeId sink = problem.get_sink_depot();
-    const int    cap  = config.max_labels > 0 ? config.max_labels : kDefaultRelaxedCap;
 
     hit_cap = false;
 
@@ -96,7 +94,7 @@ Label* DSSRSolver::run_inner_dp(
         if (li->dominated || li->extended) continue;
         li->extended = true;
         ++explored;
-        if (explored > cap) { hit_cap = true; break; }
+        if (config.max_labels > 0 && explored > config.max_labels) { hit_cap = true; break; }
 
         // Sink is a true terminal: never extend past it. Without this guard,
         // since critical_set[sink] is always false, is_visited[sink] is
@@ -109,6 +107,14 @@ Label* DSSRSolver::run_inner_dp(
         if (li->last_visit == sink) continue;
 
         for (NodeId j = 1; j < nn; ++j) {
+            // A self-loop (j == current node) always costs exactly zero
+            // travel time (distance(i,i) == 0 for any metric). For a
+            // non-critical j the elementarity check below is skipped
+            // entirely, so without this guard a label could re-extend to
+            // itself for free, re-collecting its own reward every time —
+            // an unbounded zero-cost profit injection, not a real cycle.
+            if (j == li->last_visit) continue;
+
             // Elementarity: enforce only for critical nodes
             if (critical_set[j] && li->is_visited[j]) continue;
             // Non-critical nodes may be revisited (no check)
