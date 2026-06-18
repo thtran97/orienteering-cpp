@@ -152,6 +152,8 @@ model::Solution ILSRouteRecombinationSolver::recombine_routes(
     ls.repair(recombined, visited, ctx, ls_cfg);
     for (int v = 0; v < nv; ++v)
         ls.minimize_makespan(recombined, ctx, v);
+    for (int v = 0; v < nv; ++v)
+        ls.replace(recombined, visited, ctx, v);
 
     return recombined;
 }
