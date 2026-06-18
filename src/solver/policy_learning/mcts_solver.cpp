@@ -117,6 +117,14 @@ model::Solution MCTSSolver::simulate(MCTSNode* node,
     }
 
     ls.repair(sol, visited, ctx, ls_cfg);
+
+    // Post-rollout local search: tighten each vehicle's route, then try
+    // swapping low-reward customers for higher-reward unscheduled ones.
+    for (int v = 0; v < static_cast<int>(sol.get_num_vehicles()); ++v) {
+        ls.minimize_makespan(sol, ctx, v);
+        ls.replace(sol, visited, ctx, v);
+    }
+
     return sol;
 }
 
