@@ -431,57 +431,41 @@ void GreedySolver::apply_insertion(
     auto& context = route_contexts[move.vehicle];
     route.insert(route.begin() + move.position, move.customer);
     
-    // Also insert time tracking vectors at insertion point
+    // Insert time tracking vectors at insertion point (max_shift placeholder, recomputed below)
     context.arrival_times.insert(context.arrival_times.begin() + move.position, move.arrival_time);
     context.departure_times.insert(context.departure_times.begin() + move.position, move.departure_time);
     context.max_shift.insert(context.max_shift.begin() + move.position, 0.0);
-    
-    // Update successors and incrementally update their max_shift
-    // Forward pass: propagate time downstream and compute max_shift until shift becomes 0
+
+    // Forward pass: update arrival/departure times for all successors after insertion point
     for (int i = move.position + 1; i < static_cast<int>(route.size()); ++i) {
         NodeId prev_node = route[i - 1];
         NodeId curr_node = route[i];
         Time departure_from_prev = context.departure_times[i - 1];
-        
-        // Compute new arrival and departure times for successor node
+
         Time travel_time = problem.get_travel_time(prev_node, curr_node, departure_from_prev);
         Time arrival_time = departure_from_prev + travel_time;
-        
-        // Respect time window opening if this is a time-window problem
+
         const auto& tw = problem.get_time_window(curr_node);
         Time start_service = std::max(arrival_time, tw.opening);
         Time departure_time = start_service + problem.get_service_time(curr_node);
-        
-        // Update the context for this successor
+
         context.arrival_times[i] = arrival_time;
         context.departure_times[i] = departure_time;
-        
-        // Update max_shift for successor:
-        // max_shift[i] indicates how much slack is available before violating downstream constraints
-        // This is the slack at the time window closing minus current departure time
-        Time slack = tw.closing - departure_time;
-        context.max_shift[i] = slack;
-        
-        // If slack becomes 0 or negative, successor nodes can't shift further
-        if (slack <= 0.0) {
-            break;
-        }
     }
-    
-    // Backward pass: update max_shift for predecessors
-    // Each predecessor's max_shift is limited by its successor's slack and its own time window
-    for (int i = move.position - 1; i >= 0; --i) {
-        const auto& tw_curr = problem.get_time_window(route[i]);
-        // Max shift is limited by successor's max shift
-        Time max_shift_from_successor = context.max_shift[i + 1];
-        // And also limited by available slack in current node's time window
-        Time own_slack = tw_curr.closing - context.departure_times[i];
-        context.max_shift[i] = std::min(max_shift_from_successor, own_slack);
-        
-        // If max_shift becomes 0, predecessors have no flexibility
-        if (context.max_shift[i] < 0.0) {
-            std::cerr << "Warning: max_shift became negative at position " << i << " in vehicle " << move.vehicle << std::endl;
-            throw std::runtime_error("Negative max_shift indicates an error in time window calculations");
+
+    // Full backward pass: recompute max_shift for every position from last to first.
+    // max_shift[i] = min(own_slack, max_shift[i+1]) — the canonical definition from
+    // rebuild_route_context. Doing this incrementally (only from move.position) is
+    // error-prone because inserting 0.0 as the new node's max_shift corrupts all
+    // predecessors; a full pass is O(n) either way and always correct.
+    {
+        int last = static_cast<int>(route.size()) - 1;
+        const auto& tw_last = problem.get_time_window(route[last]);
+        context.max_shift[last] = tw_last.closing - context.departure_times[last];
+        for (int i = last - 1; i >= 0; --i) {
+            const auto& tw_i = problem.get_time_window(route[i]);
+            Time slack_i = tw_i.closing - context.departure_times[i];
+            context.max_shift[i] = std::min(slack_i, context.max_shift[i + 1]);
         }
     }
     
