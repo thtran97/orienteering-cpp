@@ -13,8 +13,8 @@ namespace oplib::solver::policy_learning {
  * @brief Configuration for the MCTS solver.
  */
 struct MCTSSolverConfig : public SolverConfig {
-    int    alpha    = oplib::constants::DEFAULT_ALPHA;
-    int    rcl_size = oplib::constants::DEFAULT_RCL_SIZE;
+    int    alpha    = 3;
+    int    rcl_size = 3;
     int    rollout_depth = 10; ///< max repair steps in the simulation phase
 };
 
@@ -47,7 +47,8 @@ private:
     MCTSNode* select(MCTSNode* root) const;
     MCTSNode* expand(MCTSNode* node,
                      const model::Problem& problem,
-                     oplib::utils::Random& rng) const;
+                     oplib::utils::Random& rng,
+                     const local_search::LSConfig& ls_cfg) const;
     model::Solution simulate(MCTSNode* node,
                              const model::Problem& problem,
                              local_search::BaseLSUtils& ls,
