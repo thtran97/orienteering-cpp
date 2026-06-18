@@ -34,6 +34,9 @@ public:
     model::Solution solve(const model::Problem& problem,
                           const ILSRouteRecombinationSolverConfig& config);
 
+    /// Total wall-clock time (ms) spent inside recombine_routes() during the last solve().
+    double get_last_rr_time_ms() const { return last_rr_time_ms_; }
+
     /**
      * @brief Route-recombination operator (set-packing over a pool of routes).
      *
@@ -58,6 +61,8 @@ protected:
                              const BaseILSSolverConfig& config) override;
 
 private:
+    double last_rr_time_ms_ = 0.0;
+
     void add_to_pool(std::vector<model::Solution>& pool,
                      const model::Solution&         sol,
                      int                            pool_size,

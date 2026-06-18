@@ -181,6 +181,8 @@ model::Solution ILSRouteRecombinationSolver::do_solve(
     int    pool_size            = cfg_ptr ? cfg_ptr->pool_size            : 10;
     double similarity_threshold = cfg_ptr ? cfg_ptr->similarity_threshold : 0.5;
 
+    last_rr_time_ms_ = 0.0;
+
     oplib::utils::Random      rng(static_cast<uint32_t>(base_cfg.seed));
     local_search::BaseLSUtils ls(problem, rng);
     local_search::LSConfig    ls_cfg;
@@ -241,7 +243,9 @@ model::Solution ILSRouteRecombinationSolver::do_solve(
 
         // Route recombination when stagnating
         if (no_impr >= base_cfg.restart_threshold && !elite_pool.empty()) {
+            auto rr_t0 = Clock::now();
             model::Solution recombined = recombine_routes(problem, elite_pool, ls, ls_cfg);
+            last_rr_time_ms_ += std::chrono::duration<double, std::milli>(Clock::now() - rr_t0).count();
 
             if (recombined.total_reward > best.total_reward) {
                 best = recombined;
