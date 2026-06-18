@@ -11,8 +11,8 @@ int main(int argc, char** argv) {
     cfg.max_cpu_time   = opts.timeout;
     cfg.max_iterations = opts.iterations;
     cfg.verbose        = opts.verbose;
-    cfg.alpha          = 3;
-    cfg.rcl_size       = 5;
+    cfg.alpha          = opts.alpha;
+    cfg.rcl_size       = opts.rcl_size;
     cfg.rollout_depth  = 10;
 
     auto instances = bench::discover_instances(opts.instance_path, opts.variants);
