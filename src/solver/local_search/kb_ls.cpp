@@ -193,31 +193,6 @@ std::vector<NodeId> guess_conflict_scope(
         return scope;
     }
 
-    if (heuristic == ScopeHeuristic::RouteOrder) {
-        // Find the insertion position in the route with minimum detour cost
-        // route = [src, c1, ..., ck, sink]; positions 1..route.size()-1
-        int n_route = static_cast<int>(route.size());
-        int best_pos = 1;
-        double best_cost = std::numeric_limits<double>::max();
-        for (int i = 1; i < n_route; ++i) {
-            double cost = problem.get_travel_time(route[i - 1], c)
-                        + problem.get_travel_time(c, route[i]);
-            if (cost < best_cost) { best_cost = cost; best_pos = i; }
-        }
-        // best_pos is the index in `route` before which c is inserted.
-        // The immediately surrounding clients in route_clients are at indices
-        // (best_pos - 1) and (best_pos) in route_clients (0-based, no depots).
-        // Take a window of `want` consecutive route_clients centred there.
-        const int n_rc = static_cast<int>(route_clients.size());
-        int center = std::max(0, std::min(n_rc - 1, best_pos - 1));
-        int start  = std::max(0, center - want / 2);
-        int end    = std::min(n_rc, start + want);
-        start      = std::max(0, end - want); // re-adjust if end was clamped
-        for (int i = start; i < end; ++i)
-            scope.push_back(route_clients[i]);
-        return scope;
-    }
-
     // For the other heuristics, score each route client and keep the best `want`.
     // We use a max-heap capped at `want` (pop when full, keep smallest distance).
     // "Smallest distance = most similar" → we want to keep the `want` most similar.

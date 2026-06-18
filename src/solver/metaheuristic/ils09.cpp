@@ -49,7 +49,8 @@ model::Solution ILS09Solver::do_solve(
 
     auto t_start = Clock::now();
 
-    for (int iter = 0; config.max_iterations <= 0 || iter < config.max_iterations; ++iter) {
+    int iter = 0;
+    for (; config.max_iterations <= 0 || iter < config.max_iterations; ++iter) {
         double elapsed = std::chrono::duration<double>(Clock::now() - t_start).count();
         if (elapsed >= config.max_cpu_time) break;
 
@@ -87,6 +88,7 @@ model::Solution ILS09Solver::do_solve(
         }
     }
 
+    config.iterations_out = iter;
     return best;
 }
 

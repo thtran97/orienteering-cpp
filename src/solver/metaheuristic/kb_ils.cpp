@@ -61,7 +61,8 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
 
     auto t_start = Clock::now();
 
-    for (int iter = 0;
+    int iter = 0;
+    for (;
          config.max_iterations <= 0 || iter < config.max_iterations;
          ++iter)
     {
@@ -126,7 +127,8 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
         }
     }
 
-    config.kb_size_out = kb.size();
+    config.iterations_out = iter;
+    config.kb_size_out    = kb.size();
     return best;
 }
 

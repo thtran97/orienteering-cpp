@@ -16,6 +16,8 @@ struct BaseILSSolverConfig : public SolverConfig {
     int alpha             = oplib::constants::DEFAULT_ALPHA;
     int rcl_size          = oplib::constants::DEFAULT_RCL_SIZE;
     int restart_threshold = 10;
+
+    mutable int iterations_out = 0; ///< total iterations executed (set by do_solve)
 };
 
 /**

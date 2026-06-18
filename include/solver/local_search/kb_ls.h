@@ -23,8 +23,7 @@ enum class ScopeHeuristic {
     NearestTW,      // clients whose TW midpoint is closest to c's TW midpoint
     ShortestTW,     // clients with the shortest TW duration
     NearestClosing, // clients whose closing time is closest to c's closing time
-    Random,         // random sample
-    RouteOrder      // clients adjacent to c's best insertion point in route order
+    Random          // random sample
 };
 
 /**
