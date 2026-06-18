@@ -48,10 +48,10 @@ private:
     MCTSNode* expand(MCTSNode* node,
                      const model::Problem& problem,
                      oplib::utils::Random& rng) const;
-    double    simulate(MCTSNode* node,
-                       const model::Problem& problem,
-                       local_search::BaseLSUtils& ls,
-                       const local_search::LSConfig& ls_cfg) const;
+    model::Solution simulate(MCTSNode* node,
+                             const model::Problem& problem,
+                             local_search::BaseLSUtils& ls,
+                             const local_search::LSConfig& ls_cfg) const;
     void      backpropagate(MCTSNode* node, double reward) const;
 
     /// Extract the greedy policy solution from the tree (path with best avg value).

@@ -87,20 +87,17 @@ MCTSNode* MCTSSolver::expand(MCTSNode* node,
     return child;
 }
 
-double MCTSSolver::simulate(MCTSNode* node,
-                             const model::Problem& /*problem*/,
-                             local_search::BaseLSUtils& ls,
-                             const local_search::LSConfig& ls_cfg) const
+model::Solution MCTSSolver::simulate(MCTSNode* node,
+                                      const model::Problem& /*problem*/,
+                                      local_search::BaseLSUtils& ls,
+                                      const local_search::LSConfig& ls_cfg) const
 {
-    // Build a partial solution that includes the path from root to this node,
-    // then run repair to complete it.
+    // Build a partial solution from the path root→node, then repair to complete it.
     model::Solution                         sol;
     std::vector<bool>                       visited;
     std::vector<local_search::RouteContext> ctx;
     ls.init(sol, visited, ctx);
 
-    // Mark all nodes visited along the path as visited in the partial solution
-    // by inserting them at position 1 into vehicle 0's route
     MCTSNode* cur = node;
     std::vector<NodeId> path;
     while (cur->parent != nullptr) {
@@ -119,9 +116,8 @@ double MCTSSolver::simulate(MCTSNode* node,
         }
     }
 
-    // Complete the solution with repair
     ls.repair(sol, visited, ctx, ls_cfg);
-    return sol.total_reward;
+    return sol;
 }
 
 void MCTSSolver::backpropagate(MCTSNode* node, double reward) const
@@ -228,35 +224,15 @@ model::Solution MCTSSolver::solve(const model::Problem&   problem,
         // 2. Expansion
         MCTSNode* child = expand(leaf, problem, rng);
 
-        // 3. Simulation (rollout)
-        double reward = simulate(child, problem, ls, ls_cfg);
+        // 3. Simulation (rollout) — returns the completed solution directly
+        model::Solution rollout = simulate(child, problem, ls, ls_cfg);
+        double reward = rollout.total_reward;
 
-        // Track best solution found during rollout
+        // Track best solution found during rollout (no second repair needed)
         if (reward > best.total_reward) {
-            // Re-run repair from child state to reconstruct the full solution
-            model::Solution                         sol;
-            std::vector<bool>                       vis;
-            std::vector<local_search::RouteContext> ctx;
-            ls.init(sol, vis, ctx);
-
-            MCTSNode* c2 = child;
-            std::vector<NodeId> path;
-            while (c2->parent != nullptr) { path.push_back(c2->state); c2 = c2->parent; }
-            std::reverse(path.begin(), path.end());
-            for (NodeId nc : path) {
-                if (vis[nc]) continue;
-                auto& route = sol.get_route(0);
-                int   pos   = static_cast<int>(route.size()) - 1;
-                double shift = ls.check_insertion(sol, ctx, 0, nc, pos);
-                if (shift < local_search::BaseLSUtils::INF)
-                    ls.apply_insertion_public(sol, ctx, vis, 0, nc, pos, shift);
-            }
-            ls.repair(sol, vis, ctx, ls_cfg);
-            if (sol.total_reward > best.total_reward) {
-                best = sol;
-                if (config.verbose)
-                    std::cout << "[MCTS] iter=" << iter << " reward=" << best.total_reward << '\n';
-            }
+            best = std::move(rollout);
+            if (config.verbose)
+                std::cout << "[MCTS] iter=" << iter << " reward=" << best.total_reward << '\n';
         }
 
         // 4. Backpropagation
