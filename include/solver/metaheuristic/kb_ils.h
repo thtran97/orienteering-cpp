@@ -7,11 +7,6 @@
 
 namespace oplib::solver::metaheuristic {
 
-/**
- * @brief Configuration for the KB-guided ILS solver.
- *
- * Inherits alpha, rcl_size, and restart_threshold from BaseILSSolverConfig.
- */
 struct KBILSSolverConfig : public BaseILSSolverConfig {
     int    learn_iterations  = 100;
     int    conflict_max_size = 5;
@@ -19,22 +14,18 @@ struct KBILSSolverConfig : public BaseILSSolverConfig {
     local_search::ScopeHeuristic scope_heuristic =
         local_search::ScopeHeuristic::NearestTW;
 
-    bool adaptive_learning = false; ///< re-enable learning after every restart
-    mutable int kb_size_out = 0;   ///< set by do_solve after the run
+    mutable int kb_size_out = 0; ///< set by do_solve after the run
 };
 
 /**
- * @brief Knowledge-Base Iterated Local Search (KBILS).
+ * KB-guided ILS: port of KBLNS17::solve_v1() from kb_ls_cpp.
+ * The KB (ConflictStore, 2-watched literals) accumulates TW conflict clauses
+ * during the first `learn_iterations` iterations.  A Held-Karp xplainer
+ * extracts minimal infeasible client subsets and feeds them to the KB.
+ * The KB pre-filters candidate insertions before the expensive TW check.
  *
- * Port of KBLNS17::solve_v1() from kb_ls_cpp.  The KB (ConflictStore with
- * 2-watched literals) accumulates time-window conflict clauses during the
- * first `learn_iterations` iterations.  A Held-Karp xplainer extracts
- * minimal infeasible client subsets and feeds them to the KB.  The KB
- * pre-filters candidate insertions: if the KB knows (c, v) is infeasible,
- * the expensive TW check is skipped.
- *
- * Structure matches ILS09Solver (shake + repair + strict-improvement
- * acceptance + restart), adding the KB layer on top.
+ * Structure mirrors ILS09Solver (shake + repair + strict-improvement
+ * acceptance + restart with kb_sync).
  */
 class KBILSSolver : public BaseILSSolver {
 public:
@@ -50,15 +41,15 @@ protected:
 
 private:
     void learn_tw_conflicts(
-        knowledge_base::ConflictStore&              kb,
-        local_search::TWXplainer&                   xplainer,
+        knowledge_base::ConflictStore&                   kb,
+        local_search::TWXplainer&                        xplainer,
         const std::vector<local_search::InfeasiblePair>& pairs,
-        const model::Solution&                      solution,
-        const model::Problem&                       problem,
-        int                                         max_scope_size,
-        local_search::ScopeHeuristic                heuristic,
-        float                                       budget_ms,
-        oplib::utils::Random&                       rng);
+        const model::Solution&                           solution,
+        const model::Problem&                            problem,
+        int                                              max_scope_size,
+        local_search::ScopeHeuristic                     heuristic,
+        float                                            budget_ms,
+        oplib::utils::Random&                            rng);
 };
 
 } // namespace oplib::solver::metaheuristic
