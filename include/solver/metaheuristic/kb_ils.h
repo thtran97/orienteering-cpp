@@ -18,6 +18,8 @@ struct KBILSSolverConfig : public BaseILSSolverConfig {
     float  xplain_ms         = 500.f;
     local_search::ScopeHeuristic scope_heuristic =
         local_search::ScopeHeuristic::NearestTW;
+
+    mutable int kb_size_out = 0; ///< set by do_solve after the run
 };
 
 /**

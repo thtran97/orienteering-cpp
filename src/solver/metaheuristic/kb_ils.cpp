@@ -126,6 +126,7 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
         }
     }
 
+    config.kb_size_out = kb.size();
     return best;
 }
 
