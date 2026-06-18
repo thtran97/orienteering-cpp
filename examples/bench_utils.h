@@ -110,6 +110,12 @@ std::map<std::string, std::ofstream> open_csv_files(
 void close_csv_files(std::map<std::string, std::ofstream>& files);
 
 // ============================================================================
+// Apply CLI overrides to a parsed problem (e.g. --vehicles)
+// ============================================================================
+
+void apply_overrides(const Options& opts, Problem& problem);
+
+// ============================================================================
 // Run a solver and record timing/result
 // ============================================================================
 
