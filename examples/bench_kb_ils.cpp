@@ -24,6 +24,7 @@ static KBVariant select_variant(const std::string& id)
     if (id == "C") return {"C", 100, 3,  50.f, SH::NearestTW};
     if (id == "D") return {"D", 100, 5, 200.f, SH::NearestTW};
     if (id == "E") return {"E", 100, 5,  50.f, SH::Random};
+    if (id == "F") return {"F", 100, 3,  50.f, SH::NearestTW}; // adaptive_learning=true set below
     std::cerr << "[ERROR] Unknown KB config: '" << id << "' (use A|B|C|D|E)\n";
     std::exit(1);
 }
@@ -62,6 +63,7 @@ int main(int argc, char** argv)
     cfg.conflict_max_size = kv.conflict_max_size;
     cfg.xplain_ms         = kv.xplain_ms;
     cfg.scope_heuristic   = kv.scope_heuristic;
+    cfg.adaptive_learning = (kb_config_id == "F");
 
     auto instances = bench::discover_instances(opts.instance_path, opts.variants);
     if (instances.empty()) { std::cerr << "No instances found.\n"; return 1; }

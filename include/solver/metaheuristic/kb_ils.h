@@ -19,7 +19,8 @@ struct KBILSSolverConfig : public BaseILSSolverConfig {
     local_search::ScopeHeuristic scope_heuristic =
         local_search::ScopeHeuristic::NearestTW;
 
-    mutable int kb_size_out = 0; ///< set by do_solve after the run
+    bool adaptive_learning = false; ///< re-enable learning after every restart
+    mutable int kb_size_out = 0;   ///< set by do_solve after the run
 };
 
 /**

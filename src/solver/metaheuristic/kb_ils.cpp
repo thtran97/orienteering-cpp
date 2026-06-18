@@ -56,8 +56,9 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
     std::vector<bool>                       cur_vis  = best_vis;
     std::vector<local_search::RouteContext> cur_ctx  = best_ctx;
 
-    int shake_length = 1;
-    int no_impr      = 0;
+    int  shake_length    = 1;
+    int  no_impr         = 0;
+    bool just_restarted  = false; // triggers adaptive learning on the iter after restart
 
     auto t_start = Clock::now();
 
@@ -95,12 +96,15 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
         for (int v = 0; v < nv; ++v)
             ls.minimize_makespan(current, cur_ctx, v);
 
-        // Conflict learning (first learn_iterations only)
-        if (iter < config.learn_iterations) {
+        // Conflict learning: initial phase OR adaptive (one iter after each restart)
+        const bool do_learn = (iter < config.learn_iterations) ||
+                              (config.adaptive_learning && just_restarted);
+        if (do_learn) {
             learn_tw_conflicts(kb, xplainer, infeasible, current, problem,
                                config.conflict_max_size, config.scope_heuristic,
                                config.xplain_ms, rng);
         }
+        just_restarted = false;
 
         // Acceptance: strict improvement
         if (current.total_reward > best.total_reward) {
@@ -120,7 +124,8 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
                 cur_vis  = best_vis;
                 cur_ctx  = best_ctx;
                 ++shake_length;
-                no_impr = 0;
+                no_impr        = 0;
+                just_restarted = true;
                 local_search::kb_sync(kb, problem, best);
             }
         }
