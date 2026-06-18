@@ -37,7 +37,6 @@ build/*
 data/singlesat/*
 
 # Output files
-results/*
 logs/*
 *.csv
 benchmark_run.log
