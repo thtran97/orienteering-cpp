@@ -15,6 +15,20 @@ struct ILSRouteRecombinationSolverConfig : public BaseILSSolverConfig {
 };
 
 /**
+ * @brief Per-call configuration for the recombine_routes() operator.
+ *
+ * All flags default to false (= original baseline behaviour) so that
+ * bench_rr_strategies can test each enhancement independently on the same
+ * pre-built pool.  do_solve() passes an explicit config that enables the
+ * enhancements that are production-ready.
+ */
+struct RRConfig {
+    bool replace_pass    = false; ///< E1: replace() after minimize_makespan()
+    bool density_sort    = false; ///< E2: rank candidates by reward/customers
+    bool makespan_before = false; ///< E5: minimize_makespan() on transplanted routes before repair()
+};
+
+/**
  * @brief ILS09 extended with an elite pool and route recombination (path relinking).
  *
  * After each improvement the solution is added to the elite pool.
@@ -37,6 +51,9 @@ public:
     /// Total wall-clock time (ms) spent inside recombine_routes() during the last solve().
     double get_last_rr_time_ms() const { return last_rr_time_ms_; }
 
+    /// Elite pool captured at the end of the last solve() — use for offline strategy evaluation.
+    const std::vector<model::Solution>& get_last_pool() const { return last_pool_; }
+
     /**
      * @brief Route-recombination operator (set-packing over a pool of routes).
      *
@@ -49,19 +66,23 @@ public:
      *
      * Public + static so it can be unit-tested in isolation. This is the
      * route-level counterpart to toptwLib's route_recombinator/combinator.
+     *
+     * @param rr_cfg  Optional enhancement flags; defaults to baseline behaviour.
      */
     static model::Solution recombine_routes(
         const model::Problem&               problem,
         const std::vector<model::Solution>& pool,
         local_search::BaseLSUtils&          ls,
-        const local_search::LSConfig&       ls_cfg);
+        const local_search::LSConfig&       ls_cfg,
+        const RRConfig&                     rr_cfg = RRConfig{});
 
 protected:
     model::Solution do_solve(const model::Problem& problem,
                              const BaseILSSolverConfig& config) override;
 
 private:
-    double last_rr_time_ms_ = 0.0;
+    double                        last_rr_time_ms_ = 0.0;
+    std::vector<model::Solution>  last_pool_;
 
     void add_to_pool(std::vector<model::Solution>& pool,
                      const model::Solution&         sol,

@@ -100,14 +100,15 @@ model::Solution ILSRouteRecombinationSolver::recombine_routes(
     const model::Problem&               problem,
     const std::vector<model::Solution>& pool,
     local_search::BaseLSUtils&          ls,
-    const local_search::LSConfig&       ls_cfg)
+    const local_search::LSConfig&       ls_cfg,
+    const RRConfig&                     rr_cfg)
 {
     const int    nv   = problem.get_num_vehicles();
     const int    nn   = static_cast<int>(problem.get_num_nodes());
     const NodeId src  = problem.get_source_depot();
     const NodeId sink = problem.get_sink_depot();
 
-    struct Candidate { Reward reward; std::vector<NodeId> customers; };
+    struct Candidate { Reward reward; double sort_key; std::vector<NodeId> customers; };
     std::vector<Candidate> candidates;
     for (const auto& sol : pool) {
         for (int v = 0; v < sol.get_num_vehicles(); ++v) {
@@ -116,12 +117,16 @@ model::Solution ILSRouteRecombinationSolver::recombine_routes(
             std::vector<NodeId> customers(r.begin() + 1, r.end() - 1);
             Reward reward = 0.0;
             for (NodeId c : customers) reward += problem.get_reward(c);
-            candidates.push_back({reward, std::move(customers)});
+            // E2: sort by reward density (reward per customer) instead of total reward
+            double sort_key = rr_cfg.density_sort
+                ? reward / static_cast<double>(customers.size())
+                : reward;
+            candidates.push_back({reward, sort_key, std::move(customers)});
         }
     }
 
     std::sort(candidates.begin(), candidates.end(),
-              [](const Candidate& a, const Candidate& b) { return a.reward > b.reward; });
+              [](const Candidate& a, const Candidate& b) { return a.sort_key > b.sort_key; });
 
     model::Solution   recombined(nv);
     std::vector<bool> used(nn, false);
@@ -149,11 +154,21 @@ model::Solution ILSRouteRecombinationSolver::recombine_routes(
     std::vector<local_search::RouteContext> ctx;
     rebuild_bookkeeping(ls, problem, recombined, visited, ctx);
     recombined.total_reward = placed_reward;
+
+    // E5: re-optimise transplanted route order before repair so that repair
+    // sees a better-arranged starting point.
+    if (rr_cfg.makespan_before)
+        for (int v = 0; v < assigned; ++v)
+            ls.minimize_makespan(recombined, ctx, v);
+
     ls.repair(recombined, visited, ctx, ls_cfg);
     for (int v = 0; v < nv; ++v)
         ls.minimize_makespan(recombined, ctx, v);
-    for (int v = 0; v < nv; ++v)
-        ls.replace(recombined, visited, ctx, v);
+
+    // E1: swap lower-reward scheduled customers for higher-reward unvisited ones.
+    if (rr_cfg.replace_pass)
+        for (int v = 0; v < nv; ++v)
+            ls.replace(recombined, visited, ctx, v);
 
     return recombined;
 }
@@ -245,8 +260,10 @@ model::Solution ILSRouteRecombinationSolver::do_solve(
 
         // Route recombination when stagnating
         if (no_impr >= base_cfg.restart_threshold && !elite_pool.empty()) {
+            RRConfig prod_cfg;
+            prod_cfg.replace_pass = true;   // E1 always on in production
             auto rr_t0 = Clock::now();
-            model::Solution recombined = recombine_routes(problem, elite_pool, ls, ls_cfg);
+            model::Solution recombined = recombine_routes(problem, elite_pool, ls, ls_cfg, prod_cfg);
             last_rr_time_ms_ += std::chrono::duration<double, std::milli>(Clock::now() - rr_t0).count();
 
             if (recombined.total_reward > best.total_reward) {
@@ -268,6 +285,7 @@ model::Solution ILSRouteRecombinationSolver::do_solve(
         }
     }
 
+    last_pool_ = elite_pool;
     return best;
 }
 
