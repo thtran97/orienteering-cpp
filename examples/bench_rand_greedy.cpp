@@ -24,6 +24,7 @@ int main(int argc, char** argv) {
     for (const auto& spec : instances) {
         auto problem = bench::parse_instance(spec);
         if (!problem) { err++; continue; }
+        bench::apply_overrides(opts, *problem);
         for (int run = 1; run <= opts.runs; ++run) {
             auto r = bench::run_and_record(solver, cfg, *problem, spec, "rand_greedy", run);
             bench::write_row(csv_map.at(spec.variant), r);

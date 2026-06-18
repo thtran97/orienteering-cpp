@@ -218,6 +218,16 @@ std::unique_ptr<Problem> parse_instance(const InstanceSpec& spec)
 }
 
 // ============================================================================
+// apply_overrides
+// ============================================================================
+
+void apply_overrides(const Options& opts, Problem& problem)
+{
+    if (opts.vehicles > 0)
+        problem.set_num_vehicles(opts.vehicles);
+}
+
+// ============================================================================
 // CSV I/O
 // ============================================================================
 
