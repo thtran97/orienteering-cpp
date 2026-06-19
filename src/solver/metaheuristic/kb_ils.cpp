@@ -103,14 +103,22 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
                                config.xplain_ms, rng);
         }
 
-        // Clause forgetting: periodically remove inactive clauses
+        // Clause forgetting: periodically remove inactive clauses.
+        // compact() rebuilds the watcher structure from scratch and clears
+        // assignments. We must NOT call kb_sync() afterwards because its
+        // internal reset() would destroy the freshly-rebuilt watchers.
+        // Instead, re-assign current solution clients directly.
         if (config.forget_interval > 0 && iter > 0
             && iter % config.forget_interval == 0)
         {
             int removed = kb.compact(config.forget_min_activity);
             config.kb_removed_out += removed;
-            if (removed > 0)
-                local_search::kb_sync(kb, problem, current);
+            if (removed > 0) {
+                for (int v = 0; v < nv; ++v)
+                    for (NodeId c : current.get_route(v))
+                        if (c != src && c != sink)
+                            kb.assign(static_cast<int>(c), v);
+            }
         }
 
         // Acceptance: strict improvement
