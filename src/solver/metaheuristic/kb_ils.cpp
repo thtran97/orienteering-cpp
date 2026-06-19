@@ -140,7 +140,17 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
                 cur_ctx  = best_ctx;
                 ++shake_length;
                 no_impr = 0;
-                local_search::kb_sync(kb, problem, best);
+                if (config.preserve_kb_on_restart) {
+                    // Rebuild watcher structure with all clauses intact, then
+                    // re-assign from best solution (compact(0) keeps every clause).
+                    kb.compact(0);
+                    for (int v = 0; v < nv; ++v)
+                        for (NodeId c : best.get_route(v))
+                            if (c != src && c != sink)
+                                kb.assign(static_cast<int>(c), v);
+                } else {
+                    local_search::kb_sync(kb, problem, best);
+                }
             }
         }
     }

@@ -16,8 +16,9 @@ struct KBVariant {
     int   conflict_max_size;
     float xplain_ms;
     local_search::ScopeHeuristic scope_heuristic;
-    int   forget_interval     = 0; // 0 = no forgetting
-    int   forget_min_activity = 1;
+    int   forget_interval         = 0;     // 0 = no forgetting
+    int   forget_min_activity     = 1;
+    bool  preserve_kb_on_restart  = false; // multi-restart KB sharing
 };
 
 static KBVariant select_variant(const std::string& id)
@@ -30,7 +31,9 @@ static KBVariant select_variant(const std::string& id)
     if (id == "E") return {"E", 100, 5,  50.f, SH::Random};
     // KB-H: KB-C + clause forgetting every 500 iterations (min activity = 1)
     if (id == "H") return {"H", 100, 3,  50.f, SH::NearestTW, 500, 1};
-    std::cerr << "[ERROR] Unknown KB config: '" << id << "' (use A-E, H, or COMPARE)\n";
+    // KB-I: KB-C + multi-restart KB sharing (preserve watcher structure on restart)
+    if (id == "I") return {"I", 100, 3,  50.f, SH::NearestTW, 0, 1, true};
+    std::cerr << "[ERROR] Unknown KB config: '" << id << "' (use A-E, H-I, or COMPARE)\n";
     std::exit(1);
 }
 
@@ -63,11 +66,12 @@ static void run_compare(const bench::Options& opts, const std::string& kb_config
     kb_cfg.rcl_size           = 5;
     kb_cfg.restart_threshold  = 10;
     kb_cfg.learn_iterations   = kv.learn_iterations;
-    kb_cfg.conflict_max_size  = kv.conflict_max_size;
-    kb_cfg.xplain_ms          = kv.xplain_ms;
-    kb_cfg.scope_heuristic    = kv.scope_heuristic;
-    kb_cfg.forget_interval    = kv.forget_interval;
-    kb_cfg.forget_min_activity= kv.forget_min_activity;
+    kb_cfg.conflict_max_size       = kv.conflict_max_size;
+    kb_cfg.xplain_ms               = kv.xplain_ms;
+    kb_cfg.scope_heuristic         = kv.scope_heuristic;
+    kb_cfg.forget_interval         = kv.forget_interval;
+    kb_cfg.forget_min_activity     = kv.forget_min_activity;
+    kb_cfg.preserve_kb_on_restart  = kv.preserve_kb_on_restart;
 
     auto instances = bench::discover_instances(opts.instance_path, opts.variants);
     if (instances.empty()) { std::cerr << "No instances found.\n"; return; }
@@ -228,12 +232,13 @@ int main(int argc, char** argv)
     cfg.alpha              = 3;
     cfg.rcl_size           = 5;
     cfg.restart_threshold  = 10;
-    cfg.learn_iterations   = kv.learn_iterations;
-    cfg.conflict_max_size  = kv.conflict_max_size;
-    cfg.xplain_ms          = kv.xplain_ms;
-    cfg.scope_heuristic    = kv.scope_heuristic;
-    cfg.forget_interval    = kv.forget_interval;
-    cfg.forget_min_activity= kv.forget_min_activity;
+    cfg.learn_iterations        = kv.learn_iterations;
+    cfg.conflict_max_size       = kv.conflict_max_size;
+    cfg.xplain_ms               = kv.xplain_ms;
+    cfg.scope_heuristic         = kv.scope_heuristic;
+    cfg.forget_interval         = kv.forget_interval;
+    cfg.forget_min_activity     = kv.forget_min_activity;
+    cfg.preserve_kb_on_restart  = kv.preserve_kb_on_restart;
 
     auto instances = bench::discover_instances(opts.instance_path, opts.variants);
     if (instances.empty()) { std::cerr << "No instances found.\n"; return 1; }

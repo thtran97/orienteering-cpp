@@ -19,6 +19,10 @@ struct KBILSSolverConfig : public BaseILSSolverConfig {
     int    forget_interval     = 0;
     int    forget_min_activity = 1;
 
+    // Multi-restart KB sharing: on restart, rebuild the watcher structure from
+    // existing clauses instead of resetting it (default: reset = original behaviour).
+    bool   preserve_kb_on_restart = false;
+
     mutable int kb_size_out      = 0; ///< set by do_solve after the run
     mutable int kb_removed_out   = 0; ///< total clauses removed by compaction
 };
