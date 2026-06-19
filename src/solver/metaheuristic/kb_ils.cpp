@@ -135,22 +135,26 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
         } else {
             ++no_impr;
             if (no_impr >= config.restart_threshold) {
+                if (config.preserve_kb_on_restart) {
+                    // Incremental KB update: unassign clients leaving the
+                    // solution, assign clients entering it. The watcher
+                    // structure is preserved (no reset or rebuild needed).
+                    for (int i = 0; i < nn; ++i) {
+                        if (i == src || i == sink) continue;
+                        if (cur_vis[i] && !best_vis[i])  kb.unassign(i);
+                    }
+                    for (int v = 0; v < nv; ++v)
+                        for (NodeId c : best.get_route(v))
+                            if (c != src && c != sink && !cur_vis[c])
+                                kb.assign(static_cast<int>(c), v);
+                } else {
+                    local_search::kb_sync(kb, problem, best);
+                }
                 current  = best;
                 cur_vis  = best_vis;
                 cur_ctx  = best_ctx;
                 ++shake_length;
                 no_impr = 0;
-                if (config.preserve_kb_on_restart) {
-                    // Rebuild watcher structure with all clauses intact, then
-                    // re-assign from best solution (compact(0) keeps every clause).
-                    kb.compact(0);
-                    for (int v = 0; v < nv; ++v)
-                        for (NodeId c : best.get_route(v))
-                            if (c != src && c != sink)
-                                kb.assign(static_cast<int>(c), v);
-                } else {
-                    local_search::kb_sync(kb, problem, best);
-                }
             }
         }
     }
