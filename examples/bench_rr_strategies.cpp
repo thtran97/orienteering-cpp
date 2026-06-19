@@ -2,31 +2,40 @@
 //
 // USAGE
 //   ./bench_rr_strategies [--variant toptw] [--instance data/toptw/Cordeau]
-//                         [--timeout 10] [--quick 5] [--vehicles 2,3,4]
+//                         [--timeout 10] [--quick 5] [--pool-runs 5]
 //
 // DESIGN
 //   For each (instance, vehicle-count) pair:
-//     1. BUILD phase  — run ILS+RR for --timeout seconds.
-//                       Captures: best solution, elite pool.
-//     2. EVAL phase   — apply every RR strategy config to the SAME pool.
-//                       Near-instant: each call costs ~few ms.
 //
-//   The final score for each strategy is  max(ILS+RR_best, strategy_result),
-//   mirroring the post-processing guarantee.
+//   1. POOL-BUILD phase  — run ILS09 --pool-runs times, each for
+//                          (--timeout / --pool-runs) seconds, with seeds
+//                          seed+0 … seed+(K-1).  Collect distinct best
+//                          solutions into an elite pool.
+//                          Baseline = best reward across all K runs.
 //
-// OUTPUT
-//   Compact per-row table + per-strategy summary at the bottom.
-//   CSV written to  results/<variant>/benchmark_rr_strategies.csv
+//   2. EVAL phase        — apply every RR strategy config to the SAME pool.
+//                          Near-instant (~few ms each).
+//
+//   Final score = max(baseline, strategy_result).
+//   Delta       = final_score - baseline  (≥ 0 by construction).
+//
+//   This separation is the key difference from bench_cordeau_comparison:
+//   the pool here has NEVER been used for recombination, so strategies can
+//   genuinely improve over the baseline.
+//
+// POOL DIVERSITY FILTER
+//   Jaccard similarity: shared / |A ∪ B|.  A solution is rejected if its
+//   Jaccard similarity with any existing pool member exceeds 0.5.
 //
 // STRATEGIES TESTED
-//   baseline  — original: total-reward sort, no replace(), no pre-makespan
+//   baseline  — total-reward sort, no replace(), no pre-makespan
 //   E1        — replace() after minimize_makespan()
-//   E2        — density sort (reward/customers)
+//   E2        — density sort (reward / num_customers)
 //   E5        — minimize_makespan() before repair()
 //   E1+E2
 //   E1+E5
 //   E1+E2+E5
-//   E3(k=5)   — 5 random sub-pool attempts, best kept  (applied on top of E1)
+//   E1+E3(5)  — 5 random sub-pool attempts, best kept  (on top of E1)
 
 #include <algorithm>
 #include <chrono>
@@ -37,9 +46,11 @@
 #include <numeric>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "bench_utils.h"
+#include "solver/metaheuristic/ils09.h"
 #include "solver/metaheuristic/ils_route_recombination.h"
 #include "core/random.h"
 
@@ -72,6 +83,46 @@ static std::vector<Strategy> make_strategies()
 }
 
 // ============================================================================
+// Pool management
+// ============================================================================
+
+static double jaccard(const model::Solution& a, const model::Solution& b,
+                      int num_nodes)
+{
+    std::vector<bool> in_a(num_nodes, false), in_b(num_nodes, false);
+    for (int v = 0; v < a.get_num_vehicles(); ++v)
+        for (NodeId n : a.get_route(v)) in_a[n] = true;
+    for (int v = 0; v < b.get_num_vehicles(); ++v)
+        for (NodeId n : b.get_route(v)) in_b[n] = true;
+
+    int shared = 0, uni = 0;
+    for (int i = 0; i < num_nodes; ++i) {
+        if (in_a[i] || in_b[i]) ++uni;
+        if (in_a[i] && in_b[i]) ++shared;
+    }
+    return uni == 0 ? 1.0 : static_cast<double>(shared) / uni;
+}
+
+static void pool_add(std::vector<model::Solution>& pool,
+                     const model::Solution&         sol,
+                     int                            pool_size,
+                     int                            num_nodes,
+                     double                         sim_thresh = 0.5)
+{
+    for (const auto& m : pool)
+        if (jaccard(sol, m, num_nodes) > sim_thresh) return;
+
+    if (static_cast<int>(pool.size()) < pool_size) {
+        pool.push_back(sol);
+    } else {
+        auto worst = std::min_element(pool.begin(), pool.end(),
+            [](const model::Solution& x, const model::Solution& y){
+                return x.total_reward < y.total_reward; });
+        if (sol.total_reward > worst->total_reward) *worst = sol;
+    }
+}
+
+// ============================================================================
 // Sub-pool sampling for E3
 // ============================================================================
 
@@ -84,7 +135,6 @@ static std::vector<model::Solution> subsample(
     int k = std::max(1, static_cast<int>(pool.size() * keep_ratio));
     std::vector<int> idx(pool.size());
     std::iota(idx.begin(), idx.end(), 0);
-    // Fisher-Yates partial shuffle
     for (int i = 0; i < k; ++i) {
         int j = i + rng.next_int(0, static_cast<int>(idx.size()) - 1 - i);
         std::swap(idx[i], idx[j]);
@@ -96,19 +146,19 @@ static std::vector<model::Solution> subsample(
 }
 
 // ============================================================================
-// Evaluate one strategy on a given pool+best
+// Evaluate one strategy on a given pool + baseline
 // ============================================================================
 
 static double eval_strategy(
     const model::Problem&               problem,
     const std::vector<model::Solution>& pool,
-    double                              ils_rr_best,
+    double                              baseline,
     const Strategy&                     strategy,
     local_search::BaseLSUtils&          ls,
     const local_search::LSConfig&       ls_cfg,
     oplib::utils::Random&               rng)
 {
-    if (pool.empty()) return ils_rr_best;
+    if (pool.empty()) return baseline;
 
     model::Solution best_rr;
     bool first = true;
@@ -117,16 +167,15 @@ static double eval_strategy(
         auto s = ILSRouteRecombinationSolver::recombine_routes(
             problem, p, ls, ls_cfg, strategy.cfg);
         if (first || s.total_reward > best_rr.total_reward) {
-            best_rr = s;
-            first   = false;
+            best_rr = s; first = false;
         }
     };
 
-    try_pool(pool);  // always include a full-pool attempt
+    try_pool(pool);
     for (int t = 1; t < strategy.attempts; ++t)
         try_pool(subsample(pool, rng));
 
-    return std::max(ils_rr_best, best_rr.total_reward);
+    return std::max(baseline, best_rr.total_reward);
 }
 
 // ============================================================================
@@ -136,18 +185,18 @@ static double eval_strategy(
 static void write_csv_header(std::ofstream& f,
                               const std::vector<Strategy>& strategies)
 {
-    f << "Instance,Nodes,Vehicles,ILS_RR_best";
+    f << "Instance,Nodes,Vehicles,PoolSize,ILS09_best";
     for (const auto& s : strategies) f << ',' << s.name;
     f << '\n';
 }
 
 static void write_csv_row(std::ofstream& f,
                            const std::string& inst, int nodes, int veh,
-                           double ils_rr_best,
+                           int pool_sz, double baseline,
                            const std::vector<double>& scores)
 {
     f << std::fixed << std::setprecision(2)
-      << inst << ',' << nodes << ',' << veh << ',' << ils_rr_best;
+      << inst << ',' << nodes << ',' << veh << ',' << pool_sz << ',' << baseline;
     for (double s : scores) f << ',' << s;
     f << '\n';
 }
@@ -158,22 +207,29 @@ static void write_csv_row(std::ofstream& f,
 
 int main(int argc, char** argv)
 {
+    // ---- Parse CLI ----------------------------------------------------------
     auto opts = bench::parse_cli(argc, argv, "rr_strategies");
-
     if (opts.variants.empty() ||
-        (opts.variants.size() == bench::ALL_VARIANTS.size()))
+        opts.variants.size() == bench::ALL_VARIANTS.size())
         opts.variants = {"toptw"};
+
+    // --pool-runs N: how many ILS09 seeds to use for pool building
+    // (parsed from unknown args — bench::parse_cli ignores unknown flags)
+    int pool_runs = 5;
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--pool-runs" && i + 1 < argc)
+            pool_runs = std::stoi(argv[++i]);
+    }
+
+    const double time_per_seed = opts.timeout / pool_runs;
+
+    std::vector<int> vehicle_counts;
+    if (opts.vehicles > 0) vehicle_counts.push_back(opts.vehicles);
+    else                   vehicle_counts = {2, 3, 4};
 
     const auto strategies = make_strategies();
     const int  NS = static_cast<int>(strategies.size());
-
-    // ---- Vehicle counts from --vehicles override, otherwise 2,3,4 ----------
-    std::vector<int> vehicle_counts;
-    if (opts.vehicles > 0) {
-        vehicle_counts.push_back(opts.vehicles);
-    } else {
-        vehicle_counts = {2, 3, 4};
-    }
+    const int  POOL_SIZE = 10;
 
     // ---- Discover instances -------------------------------------------------
     auto specs = bench::discover_instances(opts.instance_path, opts.variants);
@@ -183,10 +239,12 @@ int main(int argc, char** argv)
     std::cout << "Instances: " << specs.size()
               << "  Vehicles: ";
     for (int v : vehicle_counts) std::cout << v << ' ';
-    std::cout << " Build-time: " << opts.timeout << "s\n\n";
+    std::cout << "\nPool: " << pool_runs << " ILS09 seeds × "
+              << std::fixed << std::setprecision(1) << time_per_seed << "s each"
+              << "  (total per instance: " << opts.timeout << "s)\n\n";
 
-    // ---- Strategy column header (stdout) ------------------------------------
-    const int WI = 10, WV = 3, WB = 9, WS = 9;
+    // ---- Table header -------------------------------------------------------
+    const int WI = 10, WV = 3, WB = 8, WS = 10;
     auto sep_line = [&]{
         std::cout << std::string(WI,'-') << '+' << std::string(WV+1,'-') << '+';
         std::cout << std::string(WB+1,'-');
@@ -194,9 +252,9 @@ int main(int argc, char** argv)
         std::cout << '\n';
     };
     sep_line();
-    std::cout << std::left << std::setw(WI) << "Instance"
+    std::cout << std::left  << std::setw(WI) << "Instance"
               << '|' << std::right << std::setw(WV) << "Veh"
-              << '|' << std::right << std::setw(WB) << "ILS+RR";
+              << '|' << std::right << std::setw(WB) << "ILS09";
     for (const auto& s : strategies)
         std::cout << '|' << std::right << std::setw(WS) << s.name;
     std::cout << '\n';
@@ -208,26 +266,22 @@ int main(int argc, char** argv)
                       std::ios::out | std::ios::trunc);
     write_csv_header(csv, strategies);
 
-    // ---- Per-instance accumulators ------------------------------------------
-    std::vector<double> sum_ils_rr(1, 0.0);
+    // ---- Accumulators -------------------------------------------------------
+    double        sum_base = 0.0;
     std::vector<double> sum_strat(NS, 0.0);
-    int total_rows = 0;
+    int           total_rows = 0;
+
+    // ---- ILS09 config -------------------------------------------------------
+    ILS09SolverConfig ils09_cfg;
+    ils09_cfg.max_cpu_time      = time_per_seed;
+    ils09_cfg.max_iterations    = 0;
+    ils09_cfg.alpha             = 3;
+    ils09_cfg.rcl_size          = 5;
+    ils09_cfg.restart_threshold = 10;
+
+    ILS09Solver ils09;
 
     // ---- Main loop ----------------------------------------------------------
-    ILSRouteRecombinationSolverConfig build_cfg;
-    build_cfg.seed               = opts.seed;
-    build_cfg.max_cpu_time       = opts.timeout;
-    build_cfg.max_iterations     = 0;
-    build_cfg.alpha              = 3;
-    build_cfg.rcl_size           = 5;
-    build_cfg.restart_threshold  = 10;
-    build_cfg.pool_size          = 10;
-    build_cfg.similarity_threshold = 0.5;
-
-    oplib::utils::Random eval_rng(build_cfg.seed ^ 0xDEADBEEF);
-
-    ILSRouteRecombinationSolver solver;
-
     for (const auto& spec : specs) {
         const std::string inst_name = fs::path(spec.filepath).stem().string();
 
@@ -236,45 +290,52 @@ int main(int argc, char** argv)
             if (!problem) continue;
             bench::Options veh_opts; veh_opts.vehicles = nv;
             bench::apply_overrides(veh_opts, *problem);
+            const int nn = problem->get_num_nodes();
 
-            // --- BUILD phase ------------------------------------------------
-            build_cfg.seed = opts.seed;  // reset seed per instance
-            model::Solution best = solver.solve(*problem, build_cfg);
-            double ils_rr_best   = best.total_reward;
-            const auto& pool     = solver.get_last_pool();
+            // --- POOL-BUILD phase -------------------------------------------
+            std::vector<model::Solution> pool;
+            double baseline = 0.0;
 
-            oplib::utils::Random local_rng(opts.seed ^ 0xCAFEBABE);
-            local_search::BaseLSUtils ls(*problem, local_rng);
-            local_search::LSConfig    ls_cfg;
-            ls_cfg.alpha    = build_cfg.alpha;
-            ls_cfg.rcl_size = build_cfg.rcl_size;
+            for (int k = 0; k < pool_runs; ++k) {
+                ils09_cfg.seed = opts.seed + k;
+                model::Solution sol = ils09.solve(*problem, ils09_cfg);
+                if (sol.total_reward > baseline) baseline = sol.total_reward;
+                pool_add(pool, sol, POOL_SIZE, nn);
+            }
 
             // --- EVAL phase -------------------------------------------------
+            oplib::utils::Random eval_rng(opts.seed ^ 0xABCD1234u);
+            oplib::utils::Random ls_rng  (opts.seed ^ 0x5A5A5A5Au);
+            local_search::BaseLSUtils ls(*problem, ls_rng);
+            local_search::LSConfig    ls_cfg;
+            ls_cfg.alpha    = ils09_cfg.alpha;
+            ls_cfg.rcl_size = ils09_cfg.rcl_size;
+
             std::vector<double> scores(NS);
             for (int si = 0; si < NS; ++si)
-                scores[si] = eval_strategy(*problem, pool, ils_rr_best,
+                scores[si] = eval_strategy(*problem, pool, baseline,
                                            strategies[si], ls, ls_cfg, eval_rng);
 
-            // --- Record -----------------------------------------------------
-            write_csv_row(csv, inst_name, problem->get_num_nodes(), nv,
-                          ils_rr_best, scores);
+            // --- Record & print ---------------------------------------------
+            write_csv_row(csv, inst_name, nn, nv,
+                          static_cast<int>(pool.size()), baseline, scores);
             csv.flush();
 
-            sum_ils_rr[0] += ils_rr_best;
+            sum_base += baseline;
             for (int si = 0; si < NS; ++si) sum_strat[si] += scores[si];
             ++total_rows;
 
-            // --- Print row --------------------------------------------------
             std::cout << std::left  << std::setw(WI) << inst_name
                       << '|' << std::right << std::setw(WV) << nv
                       << '|' << std::fixed << std::setprecision(0)
-                      << std::right << std::setw(WB) << ils_rr_best;
+                      << std::right << std::setw(WB) << baseline;
             for (int si = 0; si < NS; ++si) {
-                double delta = scores[si] - ils_rr_best;
+                double delta = scores[si] - baseline;
                 std::ostringstream cell;
-                if (delta > 0.5)       cell << std::fixed << std::setprecision(0) << "+" << delta;
-                else if (delta < -0.5) cell << std::fixed << std::setprecision(0) << delta;
-                else                   cell << "=";
+                if (delta > 0.5)
+                    cell << std::fixed << std::setprecision(0) << "+" << delta;
+                else
+                    cell << "=";
                 std::cout << '|' << std::right << std::setw(WS) << cell.str();
             }
             std::cout << '\n';
@@ -285,12 +346,12 @@ int main(int argc, char** argv)
     // ---- Summary ------------------------------------------------------------
     sep_line();
     if (total_rows > 0) {
-        std::cout << std::left << std::setw(WI) << "AVG_GAIN"
+        std::cout << std::left  << std::setw(WI) << "AVG_GAIN"
                   << '|' << std::right << std::setw(WV) << "-"
                   << '|' << std::fixed << std::setprecision(1)
-                  << std::right << std::setw(WB) << sum_ils_rr[0]/total_rows;
+                  << std::right << std::setw(WB) << sum_base / total_rows;
         for (int si = 0; si < NS; ++si) {
-            double avg_delta = (sum_strat[si] - sum_ils_rr[0]) / total_rows;
+            double avg_delta = (sum_strat[si] - sum_base) / total_rows;
             std::ostringstream cell;
             cell << std::fixed << std::setprecision(1)
                  << (avg_delta >= 0 ? "+" : "") << avg_delta;
