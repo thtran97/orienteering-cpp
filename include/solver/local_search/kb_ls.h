@@ -32,6 +32,9 @@ enum class ScopeHeuristic {
  * the pair is recorded in infeasible_out (for later xplain); pairs that pass
  * the KB check but fail the TW check are also recorded.  Pairs that pass both
  * are inserted normally and the KB is updated with kb.assign(c, v).
+ *
+ * backbone: optional per-client infeasibility mask (true = skip the client).
+ * Pass an empty vector to disable backbone filtering.
  */
 void kb_repair(BaseLSUtils&                        ls,
                oplib::utils::Random&               rng,
@@ -41,7 +44,15 @@ void kb_repair(BaseLSUtils&                        ls,
                std::vector<RouteContext>&           contexts,
                const LSConfig&                     config,
                knowledge_base::ConflictStore&      kb,
-               std::vector<InfeasiblePair>&         infeasible_out);
+               std::vector<InfeasiblePair>&         infeasible_out,
+               const std::vector<bool>&             backbone = {});
+
+/**
+ * Pre-compute backbone: for each client, check whether it can ever be visited
+ * in a single-client tour [src → c → sink] within the time-window and budget
+ * constraints.  Returns a per-NodeId mask where true = definitively infeasible.
+ */
+std::vector<bool> compute_backbone(const model::Problem& problem);
 
 /**
  * Synchronise the KB to an existing solution: reset all assignments, then

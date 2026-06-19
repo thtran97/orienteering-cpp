@@ -23,7 +23,8 @@ void kb_repair(BaseLSUtils&                   ls,
                std::vector<RouteContext>&     contexts,
                const LSConfig&                config,
                knowledge_base::ConflictStore& kb,
-               std::vector<InfeasiblePair>&    infeasible_out)
+               std::vector<InfeasiblePair>&    infeasible_out,
+               const std::vector<bool>&        backbone)
 {
     const int    nv   = problem.get_num_vehicles();
     const int    nn   = static_cast<int>(problem.get_num_nodes());
@@ -46,6 +47,7 @@ void kb_repair(BaseLSUtils&                   ls,
         for (NodeId c = 0; c < nn; ++c) {
             if (visited[c]) continue;
             if (c == src || c == sink) continue;
+            if (!backbone.empty() && backbone[c]) continue; // backbone infeasible
 
             double best_score = -1.0;
             int    best_v     = -1;
@@ -237,6 +239,42 @@ std::vector<NodeId> guess_conflict_scope(
         pq.pop();
     }
     return scope;
+}
+
+// ---------------------------------------------------------------------------
+// compute_backbone
+// ---------------------------------------------------------------------------
+
+std::vector<bool> compute_backbone(const model::Problem& problem)
+{
+    const int    nn     = static_cast<int>(problem.get_num_nodes());
+    const NodeId src    = problem.get_source_depot();
+    const NodeId sink   = problem.get_sink_depot();
+    const Time   budget = problem.get_budget();
+
+    std::vector<bool> infeasible(nn, false);
+
+    for (NodeId c = 0; c < nn; ++c) {
+        if (c == src || c == sink) continue;
+
+        const auto& tw      = problem.get_time_window(c);
+        const Time  service = problem.get_service_time(c);
+
+        // Earliest possible arrival at c from source
+        Time arrive = problem.get_travel_time(src, c);
+
+        // Can we reach c before its TW closes?
+        if (arrive > tw.closing) { infeasible[c] = true; continue; }
+
+        // Wait for TW opening if we arrive early, then apply service
+        Time depart = std::max(arrive, tw.opening) + service;
+
+        // Can we reach the sink before the budget expires?
+        Time arrive_sink = depart + problem.get_travel_time(c, sink);
+        if (arrive_sink > budget) { infeasible[c] = true; }
+    }
+
+    return infeasible;
 }
 
 } // namespace oplib::solver::local_search

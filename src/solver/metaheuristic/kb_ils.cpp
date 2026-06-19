@@ -32,6 +32,11 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
     knowledge_base::ConflictStore kb(nb_clients > 0 ? nb_clients : 1, nv);
     local_search::TWXplainer      xplainer(problem);
 
+    // Backbone pre-computation (optional static feasibility filter)
+    std::vector<bool> backbone;
+    if (config.use_backbone)
+        backbone = local_search::compute_backbone(problem);
+
     // ---- Initial solution ----
     model::Solution                         best;
     std::vector<bool>                       best_vis;
@@ -40,7 +45,7 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
 
     std::vector<local_search::InfeasiblePair> infeasible;
     local_search::kb_repair(ls, rng, problem, best, best_vis, best_ctx,
-                            ls_cfg, kb, infeasible);
+                            ls_cfg, kb, infeasible, backbone);
     for (int v = 0; v < nv; ++v)
         ls.minimize_makespan(best, best_ctx, v);
 
@@ -92,7 +97,7 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
         // Reconstruct with KB
         infeasible.clear();
         local_search::kb_repair(ls, rng, problem, current, cur_vis, cur_ctx,
-                                ls_cfg, kb, infeasible);
+                                ls_cfg, kb, infeasible, backbone);
         for (int v = 0; v < nv; ++v)
             ls.minimize_makespan(current, cur_ctx, v);
 

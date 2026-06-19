@@ -19,6 +19,7 @@ struct KBVariant {
     int   forget_interval         = 0;     // 0 = no forgetting
     int   forget_min_activity     = 1;
     bool  preserve_kb_on_restart  = false; // multi-restart KB sharing
+    bool  use_backbone            = false; // backbone pre-computation
 };
 
 static KBVariant select_variant(const std::string& id)
@@ -33,7 +34,9 @@ static KBVariant select_variant(const std::string& id)
     if (id == "H") return {"H", 100, 3,  50.f, SH::NearestTW, 500, 1};
     // KB-I: KB-C + multi-restart KB sharing (preserve watcher structure on restart)
     if (id == "I") return {"I", 100, 3,  50.f, SH::NearestTW, 0, 1, true};
-    std::cerr << "[ERROR] Unknown KB config: '" << id << "' (use A-E, H-I, or COMPARE)\n";
+    // KB-J: KB-C + backbone pre-computation (static TW feasibility pre-filter)
+    if (id == "J") return {"J", 100, 3,  50.f, SH::NearestTW, 0, 1, false, true};
+    std::cerr << "[ERROR] Unknown KB config: '" << id << "' (use A-E, H-J, or COMPARE)\n";
     std::exit(1);
 }
 
@@ -72,6 +75,7 @@ static void run_compare(const bench::Options& opts, const std::string& kb_config
     kb_cfg.forget_interval         = kv.forget_interval;
     kb_cfg.forget_min_activity     = kv.forget_min_activity;
     kb_cfg.preserve_kb_on_restart  = kv.preserve_kb_on_restart;
+    kb_cfg.use_backbone            = kv.use_backbone;
 
     auto instances = bench::discover_instances(opts.instance_path, opts.variants);
     if (instances.empty()) { std::cerr << "No instances found.\n"; return; }
@@ -239,6 +243,7 @@ int main(int argc, char** argv)
     cfg.forget_interval         = kv.forget_interval;
     cfg.forget_min_activity     = kv.forget_min_activity;
     cfg.preserve_kb_on_restart  = kv.preserve_kb_on_restart;
+    cfg.use_backbone            = kv.use_backbone;
 
     auto instances = bench::discover_instances(opts.instance_path, opts.variants);
     if (instances.empty()) { std::cerr << "No instances found.\n"; return 1; }
