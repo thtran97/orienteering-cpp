@@ -53,6 +53,8 @@ struct Options {
     int         quick         = 0;
     int         pulse_labels  = 0;
     int         vehicles      = 0;  ///< override num_vehicles (0 = from file)
+    int         alpha         = 3;  ///< RCL reward exponent (solver-specific)
+    int         rcl_size      = 3;  ///< RCL candidate list size (solver-specific)
 };
 
 Options parse_cli(int argc, char** argv, const std::string& solver_name);

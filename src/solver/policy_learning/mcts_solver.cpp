@@ -37,14 +37,17 @@ MCTSNode* MCTSSolver::select(MCTSNode* root) const
 
 MCTSNode* MCTSSolver::expand(MCTSNode* node,
                                const model::Problem& problem,
-                               oplib::utils::Random& rng) const
+                               oplib::utils::Random& rng,
+                               const local_search::LSConfig& ls_cfg) const
 {
     const NodeId src  = problem.get_source_depot();
     const NodeId sink = problem.get_sink_depot();
     const int    nn   = static_cast<int>(problem.get_num_nodes());
 
-    // Collect unvisited customers that are time-feasible from this node's state
-    std::vector<NodeId> candidates;
+    // Collect feasible candidates with precomputed timing and RCL score.
+    struct Candidate { NodeId id; Time dep; double score; };
+    std::vector<Candidate> candidates;
+
     for (NodeId c = 0; c < nn; ++c) {
         if (c == src || c == sink) continue;
         if (node->visited[c]) continue;
@@ -54,53 +57,58 @@ MCTSNode* MCTSSolver::expand(MCTSNode* node,
         Time arr    = node->time_consumed + travel;
         if (arr > tw_c.closing) continue;
 
-        // Check we can still reach sink after visiting c
         Time dep_c  = std::max(arr, tw_c.opening) + problem.get_service_time(c);
         Time t_sink = problem.get_travel_time(c, sink, dep_c);
         if (dep_c + t_sink > problem.get_time_window(sink).closing) continue;
-
-        // Budget check
         if (dep_c + t_sink - problem.get_time_window(src).opening > problem.get_budget()) continue;
 
-        candidates.push_back(c);
+        constexpr double EPS = 1e-5;
+        double r = problem.get_reward(c);
+        double score = std::pow(r, ls_cfg.alpha) / (travel + EPS);
+        candidates.push_back({c, dep_c, score});
     }
 
     if (candidates.empty()) return node; // leaf — cannot expand
 
-    // Pick a random candidate (exploration)
-    NodeId action = candidates[rng.next_int(0, static_cast<int>(candidates.size()) - 1)];
+    // Build RCL: keep top-rcl_size candidates by score, then pick by weighted roulette.
+    int rcl_end = std::min(ls_cfg.rcl_size, static_cast<int>(candidates.size()));
+    std::partial_sort(candidates.begin(), candidates.begin() + rcl_end, candidates.end(),
+                      [](const Candidate& a, const Candidate& b){ return a.score > b.score; });
+    candidates.resize(rcl_end);
 
-    // Create child node
-    const auto& tw_a = problem.get_time_window(action);
-    Time travel = problem.get_travel_time(node->state, action, node->time_consumed);
-    Time arr    = node->time_consumed + travel;
-    Time dep    = std::max(arr, tw_a.opening) + problem.get_service_time(action);
+    double total = 0.0;
+    for (auto& cand : candidates) total += cand.score;
+    double draw = rng.next_double(0.0, total);
+    double cum  = 0.0;
+    const Candidate* selected = &candidates.back(); // fallback
+    for (auto& cand : candidates) {
+        cum += cand.score;
+        if (cum >= draw) { selected = &cand; break; }
+    }
 
+    // Create child node from selected candidate.
     std::vector<bool> child_vis = node->visited;
-    child_vis[action] = true;
+    child_vis[selected->id] = true;
 
-    auto* child = new MCTSNode(action, node, std::move(child_vis));
-    child->reward_collected = node->reward_collected + problem.get_reward(action);
-    child->time_consumed    = dep;
+    auto* child = new MCTSNode(selected->id, node, std::move(child_vis));
+    child->reward_collected = node->reward_collected + problem.get_reward(selected->id);
+    child->time_consumed    = selected->dep;
 
-    node->add_child(action, child);
+    node->add_child(selected->id, child);
     return child;
 }
 
-double MCTSSolver::simulate(MCTSNode* node,
-                             const model::Problem& /*problem*/,
-                             local_search::BaseLSUtils& ls,
-                             const local_search::LSConfig& ls_cfg) const
+model::Solution MCTSSolver::simulate(MCTSNode* node,
+                                      const model::Problem& /*problem*/,
+                                      local_search::BaseLSUtils& ls,
+                                      const local_search::LSConfig& ls_cfg) const
 {
-    // Build a partial solution that includes the path from root to this node,
-    // then run repair to complete it.
+    // Build a partial solution from the path root→node, then repair to complete it.
     model::Solution                         sol;
     std::vector<bool>                       visited;
     std::vector<local_search::RouteContext> ctx;
     ls.init(sol, visited, ctx);
 
-    // Mark all nodes visited along the path as visited in the partial solution
-    // by inserting them at position 1 into vehicle 0's route
     MCTSNode* cur = node;
     std::vector<NodeId> path;
     while (cur->parent != nullptr) {
@@ -119,9 +127,16 @@ double MCTSSolver::simulate(MCTSNode* node,
         }
     }
 
-    // Complete the solution with repair
     ls.repair(sol, visited, ctx, ls_cfg);
-    return sol.total_reward;
+
+    // Post-rollout local search: tighten each vehicle's route, then try
+    // swapping low-reward customers for higher-reward unscheduled ones.
+    for (int v = 0; v < static_cast<int>(sol.get_num_vehicles()); ++v) {
+        ls.minimize_makespan(sol, ctx, v);
+        ls.replace(sol, visited, ctx, v);
+    }
+
+    return sol;
 }
 
 void MCTSSolver::backpropagate(MCTSNode* node, double reward) const
@@ -169,6 +184,10 @@ model::Solution MCTSSolver::extract_best(MCTSNode* root,
     }
 
     ls.repair(sol, visited, ctx, ls_cfg);
+    for (int v = 0; v < static_cast<int>(sol.get_num_vehicles()); ++v) {
+        ls.minimize_makespan(sol, ctx, v);
+        ls.replace(sol, visited, ctx, v);
+    }
     return sol;
 }
 
@@ -226,42 +245,26 @@ model::Solution MCTSSolver::solve(const model::Problem&   problem,
         MCTSNode* leaf = select(root);
 
         // 2. Expansion
-        MCTSNode* child = expand(leaf, problem, rng);
+        MCTSNode* child = expand(leaf, problem, rng, ls_cfg);
 
-        // 3. Simulation (rollout)
-        double reward = simulate(child, problem, ls, ls_cfg);
+        // 3. Simulation (rollout) — returns the completed solution directly
+        model::Solution rollout = simulate(child, problem, ls, ls_cfg);
+        double reward = rollout.total_reward;
 
-        // Track best solution found during rollout
+        // Track best solution found during rollout (no second repair needed)
         if (reward > best.total_reward) {
-            // Re-run repair from child state to reconstruct the full solution
-            model::Solution                         sol;
-            std::vector<bool>                       vis;
-            std::vector<local_search::RouteContext> ctx;
-            ls.init(sol, vis, ctx);
-
-            MCTSNode* c2 = child;
-            std::vector<NodeId> path;
-            while (c2->parent != nullptr) { path.push_back(c2->state); c2 = c2->parent; }
-            std::reverse(path.begin(), path.end());
-            for (NodeId nc : path) {
-                if (vis[nc]) continue;
-                auto& route = sol.get_route(0);
-                int   pos   = static_cast<int>(route.size()) - 1;
-                double shift = ls.check_insertion(sol, ctx, 0, nc, pos);
-                if (shift < local_search::BaseLSUtils::INF)
-                    ls.apply_insertion_public(sol, ctx, vis, 0, nc, pos, shift);
-            }
-            ls.repair(sol, vis, ctx, ls_cfg);
-            if (sol.total_reward > best.total_reward) {
-                best = sol;
-                if (config.verbose)
-                    std::cout << "[MCTS] iter=" << iter << " reward=" << best.total_reward << '\n';
-            }
+            best = std::move(rollout);
+            if (config.verbose)
+                std::cout << "[MCTS] iter=" << iter << " reward=" << best.total_reward << '\n';
         }
 
         // 4. Backpropagation
         backpropagate(child, reward);
     }
+
+    // Final extraction: follow the tree's aggregate best path as a bonus solution.
+    auto tree_best = extract_best(root, problem, ls, ls_cfg);
+    if (tree_best.total_reward > best.total_reward) best = std::move(tree_best);
 
     free_tree(root);
     return best;

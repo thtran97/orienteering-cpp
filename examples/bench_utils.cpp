@@ -379,6 +379,8 @@ Options parse_cli(int argc, char** argv, const std::string& solver_name)
         else if (a == "--runs")                      opts.runs         = std::stoi(next());
         else if (a == "--pulse-labels")              opts.pulse_labels = std::stoi(next());
         else if (a == "--vehicles")                  opts.vehicles     = std::stoi(next());
+        else if (a == "--alpha")                     opts.alpha        = std::stoi(next());
+        else if (a == "--rcl-size")                  opts.rcl_size     = std::stoi(next());
         else {
             std::cerr << "[WARN] Unknown argument: " << a << '\n';
         }
