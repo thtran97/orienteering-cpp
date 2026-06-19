@@ -103,6 +103,16 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
                                config.xplain_ms, rng);
         }
 
+        // Clause forgetting: periodically remove inactive clauses
+        if (config.forget_interval > 0 && iter > 0
+            && iter % config.forget_interval == 0)
+        {
+            int removed = kb.compact(config.forget_min_activity);
+            config.kb_removed_out += removed;
+            if (removed > 0)
+                local_search::kb_sync(kb, problem, current);
+        }
+
         // Acceptance: strict improvement
         if (current.total_reward > best.total_reward) {
             best         = current;
@@ -127,8 +137,8 @@ model::Solution KBILSSolver::do_solve(const model::Problem&         problem,
         }
     }
 
-    config.iterations_out = iter;
-    config.kb_size_out    = kb.size();
+    config.iterations_out  = iter;
+    config.kb_size_out     = kb.size();
     return best;
 }
 

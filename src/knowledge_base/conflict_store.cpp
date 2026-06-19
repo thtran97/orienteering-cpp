@@ -299,7 +299,46 @@ bool ConflictStore::can_be_true(int bx) const {
     if (assignment_[bx] == KBVal::T) return true;
     if (assignment_[bx] == KBVal::F) return false;
     // Unassigned: feasible iff no active conflict pins it to false.
-    return vars_[bx].expl.empty();
+    if (vars_[bx].expl.empty()) return true;
+    // Track which clauses are actually firing (VSIDS-style activity).
+    for (int cid : vars_[bx].expl)
+        ++conflicts_[cid].activity;
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+// Public: compact
+// ---------------------------------------------------------------------------
+
+int ConflictStore::compact(int min_activity) {
+    // Collect bool-var-encoded scopes of clauses meeting the activity threshold.
+    std::vector<std::vector<int>> kept;
+    int removed = 0;
+    for (int i = 0; i < nb_conflicts_; ++i) {
+        if (conflicts_[i].activity >= min_activity)
+            kept.push_back(conflicts_[i].scope);
+        else
+            ++removed;
+    }
+
+    if (removed == 0) return 0;
+
+    // Reset all var/conflict state (assignments cleared too — caller must kb_sync).
+    for (int bx = 1; bx <= nb_boolvars_; ++bx) {
+        assignment_[bx] = KBVal::U;
+        vars_[bx].watchable = true;
+        vars_[bx].watching_set.clear();
+        vars_[bx].active_set.clear();
+        vars_[bx].expl.clear();
+    }
+    conflicts_.clear();
+    nb_conflicts_ = 0;
+
+    // Re-add surviving clauses (activity resets to 0 on the fresh KBConflict).
+    for (auto& scope : kept)
+        add_conflict_bool(scope);
+
+    return removed;
 }
 
 } // namespace oplib::knowledge_base

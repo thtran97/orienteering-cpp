@@ -25,6 +25,7 @@ struct KBConflict {
     int              w1 = -1; // first  watched literal
     int              w2 = -1; // second watched literal
     bool             active = false;
+    mutable int      activity = 0; // bumped each time this clause blocks an assignment
     std::string to_string() const;
 };
 
@@ -60,15 +61,23 @@ public:
     void reset();
     void print_assignment() const;
 
+    /**
+     * Clause forgetting: remove all conflict clauses whose activity counter is
+     * below min_activity, then rebuild the watched-literal structure.
+     * The caller must call kb_sync() afterwards to re-establish assignments.
+     * Returns the number of clauses removed.
+     */
+    int compact(int min_activity);
+
 private:
     int nb_clients_;
     int nb_vehicles_;
     int nb_boolvars_;   // nb_clients_ * nb_vehicles_
     int nb_conflicts_ = 0;
 
-    std::vector<KBVar>      vars_;        // indexed [0..nb_boolvars_]  (1-based bx)
-    std::vector<KBVal>      assignment_;  // indexed [0..nb_boolvars_]  (1-based bx)
-    std::vector<KBConflict> conflicts_;   // indexed [0..nb_conflicts_-1]
+    std::vector<KBVar>              vars_;        // indexed [0..nb_boolvars_]  (1-based bx)
+    std::vector<KBVal>              assignment_;  // indexed [0..nb_boolvars_]  (1-based bx)
+    mutable std::vector<KBConflict> conflicts_;   // mutable so can_be_true can bump activity
 
     // temporary pointer reused in hot paths
     KBConflict* ptr_conflict_ = nullptr;

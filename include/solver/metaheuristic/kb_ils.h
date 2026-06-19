@@ -14,7 +14,13 @@ struct KBILSSolverConfig : public BaseILSSolverConfig {
     local_search::ScopeHeuristic scope_heuristic =
         local_search::ScopeHeuristic::NearestTW;
 
-    mutable int kb_size_out = 0; ///< set by do_solve after the run
+    // Clause forgetting: every forget_interval iterations remove clauses whose
+    // activity counter is below forget_min_activity. 0 = disabled.
+    int    forget_interval     = 0;
+    int    forget_min_activity = 1;
+
+    mutable int kb_size_out      = 0; ///< set by do_solve after the run
+    mutable int kb_removed_out   = 0; ///< total clauses removed by compaction
 };
 
 /**
