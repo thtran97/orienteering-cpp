@@ -1,6 +1,6 @@
 message("[INFO] Configuring CP-SAT solver library ...")
 
-add_library(cpsat_solver_lib STATIC cpsat_solver.cpp)
+add_library(cpsat_solver_lib STATIC cpsat_solver.cpp cpsat_optw_solver.cpp)
 
 target_include_directories(cpsat_solver_lib PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
