@@ -46,7 +46,7 @@ model::Solution CPSATSolver::solve(const model::Problem& problem,
 }
 
 // ---------------------------------------------------------------------------
-// Core CP-SAT implementation
+// Core CP-SAT implementation (single-vehicle OPTW/OP)
 // ---------------------------------------------------------------------------
 
 model::Solution CPSATSolver::solve(const model::Problem& problem,
@@ -80,11 +80,10 @@ model::Solution CPSATSolver::solve(const model::Problem& problem,
     if (TMAX <= 0) return empty;
 
     // ------------------------------------------------------------------
-    // Pre-compute scaled arc costs (called O(n^2) times, kept simple).
+    // Pre-compute scaled arc costs.
+    // Use floor so scaled integer costs never exceed the real cost:
+    // any route feasible in the continuous domain is also integer-feasible.
     // ------------------------------------------------------------------
-    // Use floor so scaled integer costs never exceed the real cost.
-    // This ensures any route feasible in the continuous domain is also
-    // feasible in the CP-SAT model (avoids spuriously pruning valid arcs).
     auto scaled_dist = [&](int i, int j) -> int64_t {
         return static_cast<int64_t>(
             std::floor(problem.get_distance(i, j) * static_cast<double>(TIME_SCALE)));
@@ -95,8 +94,9 @@ model::Solution CPSATSolver::solve(const model::Problem& problem,
     };
 
     // ------------------------------------------------------------------
-    // Arc feasibility: mirrors OPTWProblem::preprocessing() logic so we
-    // only create variables for arcs that can possibly appear in a valid route.
+    // Arc feasibility: only create variables for arcs that can possibly
+    // appear in a valid route. Filters based on the minimum path time
+    // source→i→j→sink (a valid lower bound by the triangle inequality).
     // ------------------------------------------------------------------
     auto arc_feasible = [&](int i, int j) -> bool {
         if (i == j)      return false;
@@ -202,6 +202,40 @@ model::Solution CPSATSolver::solve(const model::Problem& problem,
         objective += LinearExpr::Term(skip[i].Not(), r_int);
     }
     cp_model.Maximize(objective);
+
+    // ------------------------------------------------------------------
+    // Solution hint: seed CP-SAT with the trivially-feasible empty route
+    // (source → sink directly, all customers skipped). This ensures the
+    // solver finds a feasible solution immediately rather than spending all
+    // time in the LP relaxation on instances with tight time windows.
+    // ------------------------------------------------------------------
+    for (int i = 0; i < n; ++i) {
+        if (i == source || i == sink) continue;
+        cp_model.AddHint(skip[i], 1LL);  // skip all customers initially
+    }
+    // Hint real arc literals: only source→sink is active.
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            if (!has_arc[i][j]) continue;
+            cp_model.AddHint(arc_var[i][j], (i == source && j == sink) ? 1LL : 0LL);
+        }
+    }
+    // Hint start times: source at opening, sink at source+dist(source,sink),
+    // all customers at their opening time (they're skipped so value doesn't matter).
+    {
+        const int64_t src_open =
+            scale_time(problem.get_time_window(source).opening, TIME_SCALE, TMAX);
+        cp_model.AddHint(start[source], src_open);
+        const int64_t sink_hint =
+            src_open + scaled_dist(source, sink) + scaled_svc(source);
+        cp_model.AddHint(start[sink],
+                         std::min(sink_hint, TMAX));
+        for (int i = 0; i < n; ++i) {
+            if (i == source || i == sink) continue;
+            cp_model.AddHint(start[i],
+                             scale_time(problem.get_time_window(i).opening, TIME_SCALE, TMAX));
+        }
+    }
 
     // ------------------------------------------------------------------
     // Solver parameters
