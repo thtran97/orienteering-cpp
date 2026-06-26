@@ -30,3 +30,9 @@ add_bench(mcts)
 add_bench(forward_dp)
 add_bench(dssr)
 add_bench(pulse)
+
+# CP-SAT solver benchmark — only built when OR-Tools was found.
+if(CPSAT_AVAILABLE)
+    add_executable(bench_cpsat bench_cpsat.cpp)
+    target_link_libraries(bench_cpsat bench_utils cpsat_solver_lib)
+endif()

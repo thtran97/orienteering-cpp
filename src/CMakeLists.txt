@@ -6,9 +6,9 @@ project(orienteeringLib)
 message("[INFO] Start configuring src directory: ${CMAKE_CURRENT_SOURCE_DIR}")
 file(GLOB_RECURSE orienteeringLib_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
-# Remove the old orienteering_model.cpp if it conflicts or we want to retire it
-# For now, we keep it but it might need refactoring.
-# Actually, let's keep everything but ensure Boost is handled correctly.
+# The CP-SAT solver lives in its own CMakeLists with OR-Tools as a dependency.
+# Exclude it from the core library so orienteeringLib stays dependency-free.
+list(FILTER orienteeringLib_SOURCE EXCLUDE REGEX ".*/cpsat/.*\\.cpp$")
 
 add_library(orienteeringLib STATIC ${orienteeringLib_SOURCE})
 

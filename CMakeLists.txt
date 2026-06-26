@@ -22,6 +22,39 @@ include(FetchContent)
 # The compiled library code is here
 add_subdirectory(src)
 
+# Optional experimental module: external-solver-backed knowledge base
+# (kb_ls_cpp heritage -- SAT/BDD/CP backends). OFF by default so the core library
+# stays dependency-free. See experimental/external_kb/README.md.
+option(ENABLE_EXTERNAL_KB "Build the experimental external-solver KB backends (needs CryptoMiniSat/CUDD/CPLEX)" OFF)
+message("[INFO] External KB backends (ENABLE_EXTERNAL_KB): ${ENABLE_EXTERNAL_KB}")
+if(ENABLE_EXTERNAL_KB)
+    add_subdirectory(experimental/external_kb)
+endif()
+
+# Optional CP-SAT solver backed by Google OR-Tools.
+# Resolved before examples/tests so CPSAT_AVAILABLE is visible in both.
+# The core library stays dependency-free; the solver lives in its own static lib.
+option(ENABLE_CPSAT "Build the CP-SAT solver (requires Google OR-Tools)" ON)
+message("[INFO] CP-SAT solver (ENABLE_CPSAT): ${ENABLE_CPSAT}")
+set(CPSAT_AVAILABLE FALSE)
+if(ENABLE_CPSAT)
+    # Search common installation paths before falling back to system defaults.
+    list(APPEND CMAKE_PREFIX_PATH
+        "/usr/local/ortools"
+        "/opt/ortools"
+    )
+    find_package(ortools CONFIG QUIET)
+    if(ortools_FOUND)
+        message("[INFO] OR-Tools found: ${ortools_VERSION}")
+        add_subdirectory(src/solver/cpsat)
+        set(CPSAT_AVAILABLE TRUE)
+    else()
+        message("[WARNING] OR-Tools not found - CP-SAT solver will not be built. "
+                "Install OR-Tools and re-run cmake, or pass "
+                "-DCMAKE_PREFIX_PATH=/path/to/ortools.")
+    endif()
+endif()
+
 # The executable code is here
 add_subdirectory(examples)
 
@@ -33,15 +66,6 @@ message("[INFO] Build the tests: ${PACKAGE_TESTS}")
 if(PACKAGE_TESTS)
     enable_testing()
     add_subdirectory(tests)
-endif()
-
-# Optional experimental module: external-solver-backed knowledge base
-# (kb_ls_cpp heritage -- SAT/BDD/CP backends). OFF by default so the core library
-# stays dependency-free. See experimental/external_kb/README.md.
-option(ENABLE_EXTERNAL_KB "Build the experimental external-solver KB backends (needs CryptoMiniSat/CUDD/CPLEX)" OFF)
-message("[INFO] External KB backends (ENABLE_EXTERNAL_KB): ${ENABLE_EXTERNAL_KB}")
-if(ENABLE_EXTERNAL_KB)
-    add_subdirectory(experimental/external_kb)
 endif()
 
 message("[INFO] Configuring project ${PROJECT_NAME} successful!")
