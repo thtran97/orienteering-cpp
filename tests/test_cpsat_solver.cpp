@@ -8,6 +8,7 @@
 #include "model/variants/op.h"
 #include "model/variants/optw.h"
 #include "solver/checker/solution_checker.h"
+#include "solver/cpsat/cpsat_optw_solver.h"
 #include "solver/cpsat/cpsat_solver.h"
 #include "solver/dynamic_programming/dp_solvers.h"
 
@@ -170,6 +171,74 @@ TEST(CPSATSolver, OPTW_PassesSolutionChecker) {
 
     CPSATSolver solver;
     auto sol = solver.solve(p, make_cfg());
+
+    auto checker = solver::create_checker(p);
+    ASSERT_NE(checker, nullptr);
+    auto result = checker->check(p, sol);
+    EXPECT_TRUE(result.valid) << (result.violations.empty() ? "" : result.violations[0]);
+}
+
+// ---------------------------------------------------------------------------
+// CPSATOPTWSolver: dedicated OPTW-only solver tests
+// ---------------------------------------------------------------------------
+namespace {
+
+CPSATOPTWSolverConfig make_optw_cfg(double timeout = 10.0) {
+    CPSATOPTWSolverConfig c;
+    c.seed         = 42;
+    c.max_cpu_time = timeout;
+    c.verbose      = false;
+    c.num_workers  = 4;
+    c.greedy_hint  = true;
+    return c;
+}
+
+}  // namespace
+
+TEST(CPSATOptw, OPTW_FindsPositiveReward) {
+    OPTWProblem p("optw_cpsat_optw", 500.0);
+    add_nodes(p, /*with_tw=*/true);
+
+    CPSATOPTWSolver solver;
+    auto sol = solver.solve(p, make_optw_cfg());
+    validate(sol, p, "CPSATOptw_FindsPositiveReward");
+}
+
+TEST(CPSATOptw, OPTW_MatchesCPSAT) {
+    OPTWProblem p("optw_cpsat_optw_vs_cpsat", 500.0);
+    add_nodes(p, /*with_tw=*/true);
+
+    CPSATSolver cpsat;
+    CPSATOPTWSolver cpsat_optw;
+
+    const Reward r_cpsat      = cpsat.solve(p, make_cfg(30.0)).total_reward;
+    const Reward r_cpsat_optw = cpsat_optw.solve(p, make_optw_cfg(30.0)).total_reward;
+
+    // Both solvers should find the same optimum on a small instance.
+    EXPECT_NEAR(r_cpsat_optw, r_cpsat, 1e-4)
+        << "CPSATOptw=" << r_cpsat_optw << " CPSATSolver=" << r_cpsat;
+}
+
+TEST(CPSATOptw, OPTW_RejectsNonOPTW) {
+    // Solver must return an empty route (not crash) for problems without TW.
+    OPProblem p("op_no_tw", 500.0);
+    add_nodes(p, /*with_tw=*/false);
+
+    CPSATOPTWSolver solver;
+    auto sol = solver.solve(p, make_optw_cfg());
+
+    ASSERT_EQ(sol.get_num_vehicles(), 1);
+    // Empty route: source → sink only.
+    EXPECT_LE(sol.get_route(0).size(), 2u);
+    EXPECT_NEAR(sol.total_reward, 0.0, 1e-6);
+}
+
+TEST(CPSATOptw, OPTW_PassesSolutionChecker) {
+    OPTWProblem p("optw_cpsat_optw_check", 500.0);
+    add_nodes(p, /*with_tw=*/true);
+
+    CPSATOPTWSolver solver;
+    auto sol = solver.solve(p, make_optw_cfg());
 
     auto checker = solver::create_checker(p);
     ASSERT_NE(checker, nullptr);
