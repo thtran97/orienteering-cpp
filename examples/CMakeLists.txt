@@ -39,7 +39,6 @@ if(CPSAT_AVAILABLE)
     add_executable(bench_cpsat_optw bench_cpsat_optw.cpp)
     target_link_libraries(bench_cpsat_optw bench_utils cpsat_solver_lib)
 
-    # Prototype: OPTW via OR-Tools RoutingModel (not yet a project Solver).
     add_executable(bench_routing_optw bench_routing_optw.cpp)
-    target_link_libraries(bench_routing_optw bench_utils ortools::ortools)
+    target_link_libraries(bench_routing_optw bench_utils routing_solver_lib)
 endif()

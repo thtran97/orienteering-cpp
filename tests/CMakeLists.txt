@@ -29,9 +29,11 @@ target_link_libraries(test_orienteeringLib PUBLIC
   )
 add_test(NAME test_orienteeringLib COMMAND test_orienteeringLib)
 
-# Link CP-SAT solver and enable its tests when OR-Tools is available.
+# Link CP-SAT and RoutingModel solvers and enable their tests when
+# OR-Tools is available (ENABLE_CPSAT_SOLVER guards both — it really
+# means "OR-Tools available", shared by both OR-Tools-backed solvers).
 if(CPSAT_AVAILABLE)
-    target_link_libraries(test_orienteeringLib PUBLIC cpsat_solver_lib)
+    target_link_libraries(test_orienteeringLib PUBLIC cpsat_solver_lib routing_solver_lib)
     target_compile_definitions(test_orienteeringLib PRIVATE ENABLE_CPSAT_SOLVER=1)
-    message("[INFO] CP-SAT solver tests enabled.")
+    message("[INFO] CP-SAT and RoutingModel solver tests enabled.")
 endif()

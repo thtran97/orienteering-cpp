@@ -6,9 +6,11 @@ project(orienteeringLib)
 message("[INFO] Start configuring src directory: ${CMAKE_CURRENT_SOURCE_DIR}")
 file(GLOB_RECURSE orienteeringLib_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp)
 
-# The CP-SAT solver lives in its own CMakeLists with OR-Tools as a dependency.
-# Exclude it from the core library so orienteeringLib stays dependency-free.
+# The CP-SAT and RoutingModel solvers live in their own CMakeLists with
+# OR-Tools as a dependency. Exclude them from the core library so
+# orienteeringLib stays dependency-free.
 list(FILTER orienteeringLib_SOURCE EXCLUDE REGEX ".*/cpsat/.*\\.cpp$")
+list(FILTER orienteeringLib_SOURCE EXCLUDE REGEX ".*/routing/.*\\.cpp$")
 
 add_library(orienteeringLib STATIC ${orienteeringLib_SOURCE})
 

@@ -47,6 +47,7 @@ if(ENABLE_CPSAT)
     if(ortools_FOUND)
         message("[INFO] OR-Tools found: ${ortools_VERSION}")
         add_subdirectory(src/solver/cpsat)
+        add_subdirectory(src/solver/routing)
         set(CPSAT_AVAILABLE TRUE)
     else()
         message("[WARNING] OR-Tools not found - CP-SAT solver will not be built. "
